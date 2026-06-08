@@ -1,69 +1,60 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: docker.io/library/postgres:15-alpine
-    container_name: investment_tracker_db
+  db:
+    image: postgres:15
     environment:
       POSTGRES_USER: tracker_user
       POSTGRES_PASSWORD: tracker_password
       POSTGRES_DB: investment_tracker
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - givemethemoney_net
     ports:
       - "5432:5432"
-    networks:
-      - tracker_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracker_user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    restart: unless-stopped
 
   backend:
-    image: localhost/givemethemoney_backend
-    build:
-      context: ./backend
-      network: host
-    container_name: investment_tracker_backend
+    build: ./backend
     environment:
-      NODE_ENV: production
-      DB_HOST: postgres
+      DB_HOST: db
       DB_PORT: 5432
       DB_USER: tracker_user
       DB_PASSWORD: tracker_password
       DB_NAME: investment_tracker
-      JWT_SECRET: your_super_secret_jwt_key_change_in_production
-      PORT: 3001
     ports:
       - "3001:3001"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - db
     networks:
-      - tracker_network
+      - givemethemoney_net
     restart: unless-stopped
 
   frontend:
-    image: localhost/givemethemoney_frontend
-    build:
-      context: ./frontend
-      network: host
-    container_name: investment_tracker_frontend
-    environment:
-      REACT_APP_API_URL: http://localhost:3001
-    ports:
-      - "3000:3000"
+    build: ./frontend
     depends_on:
       - backend
+    ports:
+      - "8080:80"
     networks:
-      - tracker_network
+      - givemethemoney_net
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - givemethemoney_net
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  db_data:
 
 networks:
-  tracker_network:
-    driver: bridge
+  givemethemoney_net:

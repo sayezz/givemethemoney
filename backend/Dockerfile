@@ -1,48 +1,53 @@
-FROM docker.io/library/debian:bookworm as builder
+FROM debian:bookworm-slim AS builder
 
-RUN apt-get update -o Acquire::Retries=5 && apt-get install -y \
-    build-essential \
-    cmake \
-    git \
-    libssl-dev \
-    libpq-dev \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -o Acquire::Retries=5 \
+        && apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            git \
+            ca-certificates \
+            libssl-dev \
+            libpq-dev \
+        && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
 # Install oatpp
-RUN git clone https://github.com/oatpp/oatpp.git && \
-    cd oatpp && git checkout 1.3.0 && \
-    mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make install
+RUN git clone --depth 1 --branch 1.3.0 https://github.com/oatpp/oatpp.git \
+    && cd oatpp \
+    && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && make -j"$(nproc)" install
 
 # Install oatpp-postgresql
-RUN git clone https://github.com/oatpp/oatpp-postgresql.git && \
-    cd oatpp-postgresql && git checkout 1.3.0 && \
-    mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make install
+RUN git clone --depth 1 --branch 1.3.0 https://github.com/oatpp/oatpp-postgresql.git \
+    && cd oatpp-postgresql \
+    && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && make -j"$(nproc)" install
 
 # Copy and build our application
 COPY . /app
 WORKDIR /app
-RUN mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make
+RUN mkdir build \
+    && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && make -j"$(nproc)"
 
 # Runtime image
-FROM docker.io/library/debian:bookworm-slim
+FROM debian:bookworm-slim
 
-RUN apt-get update -o Acquire::Retries=5 && apt-get install -y \
-    libssl3 \
-    libpq5 \
-    ca-certificates \
+RUN apt-get update -o Acquire::Retries=5 \
+    && apt-get install -y --no-install-recommends \
+      libssl3 \
+      libpq5 \
+      ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /app/build/investment_tracker /app/investment_tracker
+
+RUN strip /app/investment_tracker || true
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
