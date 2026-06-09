@@ -1,95 +1,80 @@
 # Investment Tracker - Self-hosted Portfolio Management
 
-Ein selbstgehostetes Investment-Tracking-System mit Multi-User-Unterstützung.
+A self-hosted investment tracking system with multi-user support.
 
-**Backend: C++ mit oatpp Framework | Frontend: React | Datenbank: PostgreSQL**
+**Backend: C++ with oatpp Framework | Frontend: React | Database: PostgreSQL**
 
-## 🚀 Funktionen (Phase 1: Login & Grundstruktur)
 
-### Backend (C++)
-- ✅ User Authentication (Email/Password) - PBKDF2 hashing
-- ✅ JWT Token-basierte Autorisierung
-- ✅ PostgreSQL Connection Pool
-- ✅ Multi-User Support
-- ✅ High-Performance REST API
-- 🔨 OpenSSL Crypto für sichere Passwörter
+## Quickstart with Docker
 
-### Frontend (React)
-- ✅ Login & Register Seiten
-- ✅ Responsive Design für Mobile
-- ✅ Protected Routes
-- ✅ Token-Management
-
-### Datenbank (PostgreSQL)
-- ✅ Users Tabelle mit Email/Password Hash
-- ✅ Positions Tabelle (gebunden an User)
-- ✅ Automatische Timestamps
-- ✅ Foreign Key Constraints
-
-## 📦 Quickstart mit Docker
-
-### Voraussetzungen
+### Prerequisites
 - Docker & Docker Compose
 - Git
 
 ### Installation & Start
 
 ```bash
-cd /home/pi/givemethemoney
+git clone <repo-url>
+cd givemethemoney
 
-# Starte alle Services (PostgreSQL, C++ Backend, React Frontend)
+# Start all services (PostgreSQL, C++ Backend, React Frontend)
 docker-compose up --build
 ```
 
-**Erste Kompilierung dauert 3-5 Minuten** (oatpp wird kompiliert)
+**First build takes 3-5 minutes** (oatpp is compiled from source)
 
-### Zugriff
+### Access
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:3001/api
-- **Datenbank**: localhost:5432 (Credentials in docker-compose.yml)
+- **Database**: localhost:5432 (credentials in docker-compose.yml)
 
-### Test-Zugang
-1. Gehe zu http://localhost:3000/register
-2. Erstelle einen neuen Account (z.B. test@example.com / TestPassword123)
-3. Du wirst automatisch zum Dashboard weitergeleitet
+### Test Account
+1. Go to http://localhost:3000/register
+2. Create a new account (e.g. test@example.com / TestPassword123)
+3. You will be redirected to the dashboard automatically
 
-## 🏗️ Projektstruktur
+## Project Structure
 
 ```
 givemethemoney/
-├── backend/                       # C++ Backend mit oatpp
+├── backend/
 │   ├── src/
-│   │   ├── main.cpp              # Entry Point
+│   │   ├── main.cpp
 │   │   ├── dto/
-│   │   │   └── DTOs.hpp          # Request/Response Models
+│   │   │   └── DTOs.hpp               # Request/Response models
 │   │   ├── controller/
-│   │   │   ├── AuthController.hpp      # Login/Register Endpoints
-│   │   │   └── PositionsController.hpp # Position Endpoints
+│   │   │   ├── AuthController.hpp     # Login/Register endpoints
+│   │   │   ├── PositionsController.hpp
+│   │   │   └── StocksController.hpp   # Stock data endpoints
+│   │   ├── repository/
+│   │   │   ├── UserRepository.hpp     # User DB queries
+│   │   │   └── PositionRepository.hpp # Position DB queries
 │   │   ├── database/
-│   │   │   ├── Database.hpp      # PostgreSQL Connection
+│   │   │   ├── Database.hpp           # PostgreSQL connection & retry logic
 │   │   │   └── Database.cpp
 │   │   └── utils/
-│   │       ├── JwtUtils.hpp      # JWT Encoding/Decoding
-│   │       ├── PasswordUtils.hpp # PBKDF2 Password Hashing
-│   │       └── JsonParser.hpp    # JSON Parsing
-│   ├── init.sql                  # Database Schema
-│   ├── CMakeLists.txt            # C++ Build Config
-│   ├── conanfile.txt             # C++ Dependencies
-│   ├── Dockerfile                # Multi-stage Build
-│   └── build.sh                  # Build Script
+│   │       ├── JwtUtils.hpp           # JWT encoding/decoding
+│   │       ├── PasswordUtils.hpp      # PBKDF2 password hashing
+│   │       ├── EmailUtils.hpp
+│   │       ├── HttpClient.hpp
+│   │       ├── CorsUtils.hpp
+│   │       └── JsonParser.hpp
+│   ├── init.sql                       # Database schema
+│   ├── CMakeLists.txt
+│   └── Dockerfile                     # Multi-stage build
 ├── frontend/
 │   ├── src/
 │   │   ├── App.js
 │   │   ├── index.js
 │   │   ├── context/
-│   │   │   └── AuthContext.js # Auth State Management
+│   │   │   └── AuthContext.js         # Auth state management
 │   │   ├── pages/
 │   │   │   ├── Login.js
 │   │   │   ├── Register.js
-│   │   │   ├── Dashboard.js
-│   │   │   ├── Auth.css
-│   │   │   └── Dashboard.css
+│   │   │   └── Dashboard.js
 │   │   └── components/
+│   │       ├── AddPositionForm.js
+│   │       ├── PositionDetailModal.js
 │   │       └── ProtectedRoute.js
 │   ├── public/
 │   ├── package.json
@@ -98,54 +83,37 @@ givemethemoney/
 └── docker-compose.yml
 ```
 
-## 🔐 Sicherheit
+## Security
 
-- **Passwörter**: PBKDF2 mit 100.000 Iterationen (OpenSSL)
-- **JWT Token**: HS256 mit 7 Tage Gültigkeit
-- **Hashing**: Argon2-kompatibel, salted & keyed
-- **Constant-time Comparison** für Password Verification
-- **CORS** konfigurierbar in C++ Backend
-- **Input Validation** auf Backend & Frontend
-- **PostgreSQL** Prepared Statements gegen SQL Injection
+- **Passwords**: PBKDF2 with 100,000 iterations (OpenSSL), salted
+- **JWT Tokens**: HS256, 7-day expiry
+- **Constant-time comparison** for password verification
+- **CORS** configurable in C++ backend
+- **Input validation** on both backend and frontend
+- **PostgreSQL prepared statements** against SQL injection
 
-## 📝 Nächste Schritte (Phase 2+)
+## Environment Variables
 
-- [ ] Position Management (Add/Edit/Delete) - REST APIs
-- [ ] Database Query Service Layer (C++)
-- [ ] Echtzeit Kurs-Updates via yfinance
-- [ ] Gewinn/Verlust Berechnung Service
-- [ ] Break-even Berechnung
-- [ ] Steuern-Berechnung (26,375%)
-- [ ] Trailing Stop Verwaltung
-- [ ] Portfolio Übersicht Dashboard
-- [ ] CSV-Import von ING-Transaktionen
-- [ ] WebSocket für Live Updates
-- [ ] Automated Price Updates (APScheduler oder C++ async)
-
-## 🛠️ Environment Variablen
-
-Sind in `docker-compose.yml` und `backend/.env` definiert:
+Defined in `docker-compose.yml`:
 
 ```env
-NODE_ENV=production
-DB_HOST=postgres        # PostgreSQL Service
+DB_HOST=postgres
 DB_PORT=5432
 DB_USER=tracker_user
 DB_PASSWORD=tracker_password
 DB_NAME=investment_tracker
-JWT_SECRET=your_super_secret_key (change!)
+JWT_SECRET=your_super_secret_key   # Change before deploying!
 PORT=3001
 ```
 
-## 🔧 Lokales Kompilieren (ohne Docker)
+## Building Locally (without Docker)
 
 ```bash
 cd backend
 
-# Prerequisites: cmake, g++, libssl-dev, postgresql-dev
-sudo apt-get install cmake build-essential libssl-dev
+# Prerequisites
+sudo apt-get install cmake build-essential libssl-dev libpq-dev
 
-# Download & build oatpp dependencies
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
@@ -153,13 +121,6 @@ make -j$(nproc)
 # Executable: ./investment_tracker
 ```
 
-## 📱 Browser-Kompatibilität
+## License
 
-- Chrome/Edge (neueste)
-- Firefox (neueste)
-- Safari (neueste)
-- Mobile Browser
-
-## 📄 Lizenz
-
-MIT
+Apache 2.0
