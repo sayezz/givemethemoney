@@ -3,8 +3,12 @@
 
 #include <string>
 #include <map>
+#include <vector>
+#include <sstream>
+#include <ctime>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+#include <openssl/evp.h>
 #include "oatpp/core/data/stream/BufferStream.hpp"
 #include "oatpp/core/utils/ConversionUtils.hpp"
 
@@ -12,8 +16,8 @@ class JwtUtils {
 public:
   static std::string encode(int userId, const std::string& email, const std::string& secret) {
     std::string header = R"({"alg":"HS256","typ":"JWT"})";
-    std::string payload = std::string(R"({"id":)") + std::to_string(userId) + 
-                         std::string(R"(,"email":"") + email + 
+    std::string payload = std::string(R"({"id":)") + std::to_string(userId) +
+                         std::string(R"(,"email":")") + email +
                          std::string(R"(","exp":)") + std::to_string(time(nullptr) + 604800) + "}";
     
     std::string headerEncoded = base64url_encode(header);

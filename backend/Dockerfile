@@ -8,6 +8,7 @@ RUN apt-get update -o Acquire::Retries=5 \
             ca-certificates \
             libssl-dev \
             libpq-dev \
+            libcurl4-openssl-dev \
         && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -29,9 +30,10 @@ RUN git clone --depth 1 --branch 1.3.0 https://github.com/oatpp/oatpp-postgresql
 # Copy and build our application
 COPY . /app
 WORKDIR /app
-RUN mkdir build \
-    && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+RUN rm -rf /tmp/app-build \
+    && mkdir -p /tmp/app-build \
+    && cd /tmp/app-build \
+    && cmake /app -DCMAKE_BUILD_TYPE=Release \
     && make -j"$(nproc)"
 
 # Runtime image
@@ -41,11 +43,12 @@ RUN apt-get update -o Acquire::Retries=5 \
     && apt-get install -y --no-install-recommends \
       libssl3 \
       libpq5 \
+      libcurl4 \
       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /app/build/investment_tracker /app/investment_tracker
+COPY --from=builder /tmp/app-build/investment_tracker /app/investment_tracker
 
 RUN strip /app/investment_tracker || true
 

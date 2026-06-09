@@ -30,8 +30,7 @@ const Login = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <h1>📈 Investment Tracker</h1>
-          <p>Self-hosted Portfolio Management</p>
+          <h1>Give Me The Money</h1>
         </div>
         
         <form onSubmit={handleSubmit} className="auth-form">

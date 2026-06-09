@@ -2,8 +2,11 @@
 #define UTILS_PASSWORD_H
 
 #include <string>
+#include <stdexcept>
+#include <cstdio>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <openssl/crypto.h>
 #include <cstring>
 
 class PasswordUtils {
@@ -51,7 +54,7 @@ public:
     }
 
     // Constant time comparison
-    return OPENSSL_memcmp(computed, expected, sizeof(computed)) == 0;
+    return CRYPTO_memcmp(computed, expected, sizeof(computed)) == 0;
   }
 
 private:

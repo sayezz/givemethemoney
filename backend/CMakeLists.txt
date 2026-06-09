@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(oatpp 1.3.0 REQUIRED)
 find_package(oatpp-postgresql 1.3.0 REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 
 # Source files
 file(GLOB_RECURSE APP_SOURCES 
@@ -23,6 +24,7 @@ target_link_libraries(investment_tracker
   oatpp::oatpp-postgresql
   OpenSSL::Crypto
   OpenSSL::SSL
+  CURL::libcurl
 )
 
 # Include directories

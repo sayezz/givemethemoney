@@ -1,0 +1,267 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 980px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.modal-ticker {
+  font-size: 22px;
+  font-weight: 700;
+  color: #764ba2;
+  margin-right: 12px;
+}
+
+.modal-fullname {
+  font-size: 15px;
+  color: #555;
+}
+
+.modal-close-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.modal-close-btn:hover { background: #f5f5f5; color: #333; border-color: #bbb; }
+
+/* ── Scroll body ─────────────────────────────────────────── */
+.modal-scroll {
+  overflow-y: auto;
+  padding: 20px 24px 28px;
+  flex: 1;
+}
+
+.modal-loading {
+  color: #aaa;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ── Two-column layout ───────────────────────────────────── */
+.modal-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 700px) {
+  .modal-cols { grid-template-columns: 1fr; }
+}
+
+/* ── Section ─────────────────────────────────────────────── */
+.ds {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.ds-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+  margin-bottom: 10px;
+}
+
+.ds-description {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Detail row ──────────────────────────────────────────── */
+.dr {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  gap: 8px;
+}
+.dr:last-child { border-bottom: none; }
+
+.dr-label { color: #777; flex: 1; white-space: nowrap; }
+.dr-value { color: #222; font-weight: 500; text-align: right; }
+
+.dr.dr-accent {
+  background: rgba(102, 126, 234, 0.06);
+  margin: 4px -4px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  border-bottom: none;
+}
+.dr.dr-accent .dr-value { color: #5a3d8a; font-weight: 700; font-size: 14px; }
+.dr.dr-muted  .dr-value { color: #aaa; }
+
+/* ── KGV / PEG badges ────────────────────────────────────── */
+.metric-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kgv-low      { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.kgv-mid      { background: #fff8e1; color: #f57f17; border: 1px solid #ffe082; }
+.kgv-high     { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+.kgv-rocket   { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
+
+.peg-cheap    { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.peg-fair     { background: #fff8e1; color: #f57f17; border: 1px solid #ffe082; }
+.peg-expensive{ background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+
+/* ── KGV / PEG legend ────────────────────────────────────── */
+.metric-legend {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-legend-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.metric-legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #999;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.metric-legend-warning {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.5;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-radius: 4px;
+  border-left: 3px solid #ffd54f;
+}
+
+/* ── Target price cards ──────────────────────────────────── */
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .target-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.target-card {
+  background: #f7f7f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.target-card.target-reached {
+  background: rgba(102, 187, 106, 0.1);
+  border-color: #66bb6a;
+}
+
+.tc-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #999;
+  margin-bottom: 6px;
+}
+.tc-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+}
+.target-reached .tc-price { color: #2e7d32; }
+.tc-dist { font-size: 11px; color: #aaa; }
+.target-reached .tc-dist { color: #4caf50; font-weight: 600; }
+
+/* ── Trailing stop ───────────────────────────────────────── */
+.ts-activation-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f7f7f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 10px;
+}
+.ts-activation-row.ts-active { background: rgba(66,165,245,0.08); border-color: #42a5f5; }
+
+.ts-act-price  { font-size: 16px; font-weight: 700; color: #222; }
+.ts-act-status { margin-left: auto; font-size: 12px; font-weight: 600; color: #aaa; }
+.ts-active .ts-act-status { color: #42a5f5; }
+
+.ts-base-note {
+  font-size: 11px;
+  color: #42a5f5;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.ts-grid { grid-template-columns: repeat(3, 1fr); }
+
+.ts-card.ts-triggered { background: rgba(66,165,245,0.07); border-color: #90caf9; }
+.ts-triggered .tc-price { color: #1565c0; }
+.ts-triggered .tc-dist  { color: #42a5f5; font-weight: 600; }

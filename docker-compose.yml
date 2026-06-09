@@ -22,6 +22,11 @@ services:
       DB_USER: tracker_user
       DB_PASSWORD: tracker_password
       DB_NAME: investment_tracker
+      FMP_API_KEY: ${FMP_API_KEY}
+      AV_API_KEY: ${AV_API_KEY}
+      SMTP_URL: ${SMTP_URL}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
     ports:
       - "3001:3001"
     depends_on:

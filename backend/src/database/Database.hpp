@@ -3,17 +3,18 @@
 
 #include "oatpp-postgresql/orm.hpp"
 #include <memory>
+#include <string>
 
 class Database {
 private:
-  std::shared_ptr<oatpp::orm::Connection> connection;
+  std::shared_ptr<oatpp::postgresql::ConnectionProvider> m_connectionProvider;
+  std::shared_ptr<oatpp::postgresql::Executor> m_executor;
 
 public:
-  Database(const std::string& host, int port, const std::string& user, 
+  Database(const std::string& host, int port, const std::string& user,
            const std::string& password, const std::string& database);
-  
-  std::shared_ptr<oatpp::orm::Connection> getConnection();
-  void initialize();
+
+  std::shared_ptr<oatpp::orm::Executor> getExecutor();
 };
 
 #endif // DATABASE_H
