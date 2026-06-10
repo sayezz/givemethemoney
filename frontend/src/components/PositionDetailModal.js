@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { CurrencyAmount, formatDual } from '../utils/currency';
 import './PositionDetailModal.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 const fmt = (v, dec = 2) =>
   Number(v || 0).toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-const fmtEur = (v) => `${fmt(v)} €`;
 const fmtPct = (v) => `${fmt(v)} %`;
 const fmtVol = (v) => {
   if (v == null) return '—';
@@ -48,9 +48,23 @@ const Sec = ({ title, children }) => (
   </div>
 );
 
-const PositionDetailModal = ({ position, currentPrice, onClose }) => {
+const PositionDetailModal = ({ position, quote, fxRate, onClose }) => {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // ── Currency handling ────────────────────────────────────────────────────
+  // Native currency is the primary display everywhere; € is shown as secondary info.
+  const nativeCurrency = quote?.currency || 'EUR';
+  const currentPriceNative = quote?.price ?? null;
+  // EUR equivalent of the live price (ground truth for all P&L math)
+  const currentPrice = nativeCurrency === 'EUR'
+    ? currentPriceNative
+    : (fxRate ? currentPriceNative / fxRate : null);
+
+  // EUR ground-truth value -> native currency
+  const toNative = (v) => (v == null) ? null : (nativeCurrency === 'EUR' ? v : (fxRate ? v * fxRate : null));
+  // Native-currency ground-truth value -> EUR
+  const toEur = (v) => (v == null) ? null : (nativeCurrency === 'EUR' ? v : (fxRate ? v / fxRate : null));
 
   useEffect(() => {
     setLoading(true);
@@ -140,20 +154,21 @@ const PositionDetailModal = ({ position, currentPrice, onClose }) => {
               </Sec>
 
               <Sec title="Marktdaten">
-                <Row label="Aktueller Kurs"
-                  value={currentPrice !== null ? fmtEur(currentPrice) : '…'} accent />
+                <Row label="Aktueller Kurs" accent>
+                  <CurrencyAmount native={currentPriceNative} eur={toEur(currentPriceNative)} currency={nativeCurrency} />
+                </Row>
                 <Row label="Veränderung ggü. Kauf"
                   value={pct !== null ? `${pct >= 0 ? '+' : ''}${fmt(pct)} %` : '…'} />
                 {d?.dayHigh != null && d?.dayLow != null && (
                   <Row label="Tageshoch / -tief"
-                    value={`${fmtEur(d.dayHigh)} / ${fmtEur(d.dayLow)}`} />
+                    value={`${formatDual(d.dayHigh, toEur(d.dayHigh), nativeCurrency)} / ${formatDual(d.dayLow, toEur(d.dayLow), nativeCurrency)}`} />
                 )}
                 {d?.volume != null && (
                   <Row label="Volumen" value={fmtVol(d.volume)} />
                 )}
                 {d?.fiftyTwoWeekHigh != null && d?.fiftyTwoWeekLow != null && (
                   <Row label="52-Wochen-Spanne"
-                    value={`${fmt(d.fiftyTwoWeekLow)} – ${fmt(d.fiftyTwoWeekHigh)}`} />
+                    value={`${formatDual(d.fiftyTwoWeekLow, toEur(d.fiftyTwoWeekLow), nativeCurrency)} – ${formatDual(d.fiftyTwoWeekHigh, toEur(d.fiftyTwoWeekHigh), nativeCurrency)}`} />
                 )}
               </Sec>
 
@@ -186,7 +201,9 @@ const PositionDetailModal = ({ position, currentPrice, onClose }) => {
                     <Row label="Jahresdividende" value={`${fmt(d.lastDividendAmount)} ${d.currency || ''}`} />
                   )}
                   {d?.analystTargetPrice != null && (
-                    <Row label="Analystenkurs" value={fmtEur(d.analystTargetPrice)} accent />
+                    <Row label="Analystenkurs" accent>
+                      <CurrencyAmount native={d.analystTargetPrice} eur={toEur(d.analystTargetPrice)} currency={nativeCurrency} />
+                    </Row>
                   )}
 
                   <div className="metric-legend">
@@ -216,26 +233,48 @@ const PositionDetailModal = ({ position, currentPrice, onClose }) => {
 
               <Sec title="Dein Investment">
                 <Row label="Menge"             value={position.quantity} />
-                <Row label="Kaufkurs / Aktie"  value={fmtEur(kurs)} />
-                <Row label="Kaufpreis gesamt"  value={fmtEur(position.purchase_cost)} />
-                <Row label="Kaufgebühr fix"    value={fmtEur(position.purchase_fee_fixed)} />
+                <Row label="Kaufkurs / Aktie">
+                  <CurrencyAmount native={toNative(kurs)} eur={kurs} currency={nativeCurrency} />
+                </Row>
+                <Row label="Kaufpreis gesamt">
+                  <CurrencyAmount native={toNative(position.purchase_cost)} eur={position.purchase_cost} currency={nativeCurrency} />
+                </Row>
+                <Row label="Kaufgebühr fix">
+                  <CurrencyAmount native={toNative(position.purchase_fee_fixed)} eur={position.purchase_fee_fixed} currency={nativeCurrency} />
+                </Row>
                 <Row label="Kaufgebühr %"      value={fmtPct(position.purchase_fee_percent)} />
-                <Row label="Kaufgebühren ges." value={fmtEur(position.purchase_fee)} />
-                <Row label="Einstandspreis"    value={fmtEur(acquisitionCost)} accent />
+                <Row label="Kaufgebühren ges.">
+                  <CurrencyAmount native={toNative(position.purchase_fee)} eur={position.purchase_fee} currency={nativeCurrency} />
+                </Row>
+                <Row label="Einstandspreis" accent>
+                  <CurrencyAmount native={toNative(acquisitionCost)} eur={acquisitionCost} currency={nativeCurrency} />
+                </Row>
               </Sec>
 
               {currentPrice !== null && (
-                <Sec title={`Verkauf bei ${fmtEur(currentPrice)}`}>
-                  <Row label="Bruttoerlös"             value={fmtEur(saleGross)} />
-                  <Row label="Verkaufsgebühr fix"      value={fmtEur(sellFeeFixed)} />
+                <Sec title={`Verkauf bei ${formatDual(currentPriceNative, currentPrice, nativeCurrency)}`}>
+                  <Row label="Bruttoerlös">
+                    <CurrencyAmount native={toNative(saleGross)} eur={saleGross} currency={nativeCurrency} />
+                  </Row>
+                  <Row label="Verkaufsgebühr fix">
+                    <CurrencyAmount native={toNative(sellFeeFixed)} eur={sellFeeFixed} currency={nativeCurrency} />
+                  </Row>
                   <Row label="Verkaufsgebühr %"        value={fmtPct(position.sell_fee_percent)} />
-                  <Row label="Verkaufsgebühren ges."   value={fmtEur(sellFeeAmt)} />
-                  <Row label="Nettoerlös (vor Steuer)" value={fmtEur(netSale)} />
-                  <Row label={`Steuer (${fmt(position.tax_rate)} %)`}
-                    value={tax > 0 ? fmtEur(tax) : '—'} muted={tax <= 0} />
-                  <Row label="Nettoerlös"              value={fmtEur(netProceeds)} accent />
-                  <Row label="Nettogewinn/-verlust"
-                    value={`${netProfit >= 0 ? '+' : ''}${fmtEur(netProfit)}`} accent />
+                  <Row label="Verkaufsgebühren ges.">
+                    <CurrencyAmount native={toNative(sellFeeAmt)} eur={sellFeeAmt} currency={nativeCurrency} />
+                  </Row>
+                  <Row label="Nettoerlös (vor Steuer)">
+                    <CurrencyAmount native={toNative(netSale)} eur={netSale} currency={nativeCurrency} />
+                  </Row>
+                  <Row label={`Steuer (${fmt(position.tax_rate)} %)`} muted={tax <= 0}>
+                    {tax > 0 ? <CurrencyAmount native={toNative(tax)} eur={tax} currency={nativeCurrency} /> : '—'}
+                  </Row>
+                  <Row label="Nettoerlös" accent>
+                    <CurrencyAmount native={toNative(netProceeds)} eur={netProceeds} currency={nativeCurrency} />
+                  </Row>
+                  <Row label="Nettogewinn/-verlust" accent>
+                    <CurrencyAmount native={toNative(netProfit)} eur={netProfit} currency={nativeCurrency} signed />
+                  </Row>
                 </Sec>
               )}
             </div>
@@ -257,10 +296,14 @@ const PositionDetailModal = ({ position, currentPrice, onClose }) => {
                   return (
                     <div key={label} className={`target-card ${reached ? 'target-reached' : ''}`}>
                       <div className="tc-label">{label}</div>
-                      <div className="tc-price">{price != null ? fmtEur(price) : '—'}</div>
+                      <div className="tc-price">
+                        {price != null
+                          ? <CurrencyAmount native={toNative(price)} eur={price} currency={nativeCurrency} />
+                          : '—'}
+                      </div>
                       <div className="tc-dist">
                         {currentPrice !== null && price !== null
-                          ? reached ? '✓ erreicht' : `noch ${fmtEur(price - currentPrice)}`
+                          ? reached ? '✓ erreicht' : `noch ${formatDual(toNative(price - currentPrice), price - currentPrice, nativeCurrency)}`
                           : ''}
                       </div>
                     </div>
@@ -275,22 +318,26 @@ const PositionDetailModal = ({ position, currentPrice, onClose }) => {
             <Sec title="Trailing Stop">
               <div className={`ts-activation-row ${tsActive ? 'ts-active' : ''}`}>
                 <span>Aktivierung ab</span>
-                <span className="ts-act-price">{fmtEur(tsActivation)}</span>
+                <span className="ts-act-price">
+                  <CurrencyAmount native={toNative(tsActivation)} eur={tsActivation} currency={nativeCurrency} />
+                </span>
                 <span className="ts-act-status">{tsActive ? '✓ aktiv' : 'noch nicht aktiv'}</span>
               </div>
               {tsActive && (
                 <div className="ts-base-note">
-                  Stoppkurse basieren auf aktuellem Kurs {fmtEur(currentPrice)}
+                  Stoppkurse basieren auf aktuellem Kurs {formatDual(toNative(currentPrice), currentPrice, nativeCurrency)}
                 </div>
               )}
               <div className="target-grid ts-grid">
                 {stops.map(({ label, price }) => (
                   <div key={label} className={`target-card ts-card ${tsActive ? 'ts-triggered' : ''}`}>
                     <div className="tc-label">{label}</div>
-                    <div className="tc-price">{fmtEur(price)}</div>
+                    <div className="tc-price">
+                      <CurrencyAmount native={toNative(price)} eur={price} currency={nativeCurrency} />
+                    </div>
                     <div className="tc-dist">
                       {tsActive && currentPrice !== null
-                        ? `Abstand ${fmtEur(currentPrice - price)}` : ''}
+                        ? `Abstand ${formatDual(toNative(currentPrice - price), currentPrice - price, nativeCurrency)}` : ''}
                     </div>
                   </div>
                 ))}

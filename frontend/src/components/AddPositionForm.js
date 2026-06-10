@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { currencySymbol, formatDual } from '../utils/currency';
 import './AddPositionForm.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-const formatCurrency = (value) =>
-  Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const AddPositionForm = ({ onCreated, onCancel }) => {
   const [query, setQuery] = useState('');
@@ -15,9 +13,12 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
 
   const [selectedStock, setSelectedStock] = useState(null);
   const [quantity, setQuantity] = useState('');
+  // price is always entered/displayed in the stock's native currency
   const [price, setPrice] = useState('');
-  const [originalPrice, setOriginalPrice] = useState(null);
-  const [originalCurrency, setOriginalCurrency] = useState(null);
+  const [currency, setCurrency] = useState('EUR');
+  // native currency units per 1 EUR
+  const [fxRate, setFxRate] = useState(1);
+  const [fxRateError, setFxRateError] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
   const [fixedFee, setFixedFee] = useState('4.90');
   const [percentFee, setPercentFee] = useState('0.25');
@@ -65,8 +66,9 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
     setShowResults(false);
     setSearchResults([]);
     setError('');
-    setOriginalPrice(null);
-    setOriginalCurrency(null);
+    setCurrency('EUR');
+    setFxRate(1);
+    setFxRateError(false);
 
     setPriceLoading(true);
     try {
@@ -83,25 +85,27 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
           adjCurr = 'GBP';
         }
 
-        setOriginalCurrency(curr);
-        setOriginalPrice(adjPrice);
+        setCurrency(adjCurr);
+        setPrice(String(adjPrice));
 
         if (adjCurr === 'EUR') {
-          setPrice(String(adjPrice));
+          setFxRate(1);
         } else {
-          // Fetch EUR conversion rate: EUR{adjCurr}=X gives how many adjCurr per 1 EUR
+          // Fetch EUR conversion rate: EUR{adjCurr}=X gives how many adjCurr per 1 EUR.
+          // Note: must be sent unencoded — the backend doesn't URL-decode query
+          // params, so an axios `params` object (which encodes '=' to %3D) 404s.
           try {
-            const rateResp = await axios.get(`${API_URL}/stocks/quote`, {
-              params: { symbol: `EUR${adjCurr}=X` },
-            });
+            const rateResp = await axios.get(`${API_URL}/stocks/quote?symbol=EUR${adjCurr}=X`);
             const rate = rateResp.data.quote?.price;
             if (rate && rate > 0) {
-              setPrice((adjPrice / rate).toFixed(4));
+              setFxRate(rate);
             } else {
-              setPrice(String(adjPrice));
+              setFxRate(1);
+              setFxRateError(true);
             }
           } catch {
-            setPrice(String(adjPrice));
+            setFxRate(1);
+            setFxRateError(true);
           }
         }
       }
@@ -113,18 +117,23 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
   };
 
   const quantityNum = parseFloat(quantity) || 0;
-  const priceNum = parseFloat(price) || 0;
-  const fixedFeeNum = parseFloat(fixedFee) || 0;
+  const priceNum = parseFloat(price) || 0; // native currency
+  const fixedFeeNum = parseFloat(fixedFee) || 0; // EUR
   const percentFeeNum = parseFloat(percentFee) || 0;
 
-  const sellFeeFixedNum = parseFloat(sellFeeFixed) || 0;
+  const sellFeeFixedNum = parseFloat(sellFeeFixed) || 0; // EUR
   const sellFeePercentNum = parseFloat(sellFeePercent) || 0;
   const taxRateNum = parseFloat(taxRate) || 0;
 
-  const purchaseCost = quantityNum * priceNum;
+  // All amounts stored in the backend are EUR ground truth — convert from
+  // the native-currency price using the cached EUR/native FX rate.
+  const purchaseCostNative = quantityNum * priceNum;
+  const purchaseCost = currency === 'EUR' ? purchaseCostNative : purchaseCostNative / fxRate;
   const purchaseFee = fixedFeeNum + (percentFeeNum / 100) * purchaseCost;
   const sellFee = sellFeeFixedNum + (sellFeePercentNum / 100) * purchaseCost;
   const totalCost = purchaseCost + purchaseFee;
+
+  const toNative = (eurValue) => currency === 'EUR' ? eurValue : eurValue * fxRate;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -217,7 +226,7 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
         </div>
         <div className="form-group">
           <label>
-            Preis der Aktie {priceLoading && <span className="hint">(lädt aktuellen Kurs...)</span>}
+            Preis der Aktie ({currencySymbol(currency)}) {priceLoading && <span className="hint">(lädt aktuellen Kurs...)</span>}
           </label>
           <input
             type="number"
@@ -230,8 +239,10 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
           />
           {selectedStock && (
             <span className="hint">
-              {originalCurrency && originalCurrency !== 'EUR' && originalPrice != null
-                ? `Originalkurs: ${formatCurrency(originalPrice)} ${originalCurrency} → umgerechnet in EUR. Bei Bedarf anpassen.`
+              {currency !== 'EUR'
+                ? fxRateError
+                  ? `Wechselkurs konnte nicht geladen werden — Preis wird als € behandelt. Bei Bedarf anpassen.`
+                  : `Kurs in ${currency} (1 € ≈ ${fxRate.toFixed(4)} ${currency}) — bei Bedarf anpassen.`
                 : 'Automatisch befüllt — bei Bedarf anpassen.'}
             </span>
           )}
@@ -241,7 +252,7 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
       <div className="form-section-label">Kaufgebühren</div>
       <div className="form-row">
         <div className="form-group">
-          <label>Ordergebühr fix</label>
+          <label>Ordergebühr fix (€)</label>
           <input
             type="number"
             min="0"
@@ -267,7 +278,7 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
       <div className="form-section-label">Verkaufsgebühren</div>
       <div className="form-row form-row-3">
         <div className="form-group">
-          <label>Ordergebühr fix</label>
+          <label>Ordergebühr fix (€)</label>
           <input
             type="number"
             min="0"
@@ -316,19 +327,19 @@ const AddPositionForm = ({ onCreated, onCancel }) => {
       <div className="total-summary">
         <div className="total-row">
           <span>Kaufpreis (Menge × Preis)</span>
-          <span>{formatCurrency(purchaseCost)}</span>
+          <span>{formatDual(purchaseCostNative, purchaseCost, currency)}</span>
         </div>
         <div className="total-row">
           <span>Kaufgebühren gesamt</span>
-          <span>{formatCurrency(purchaseFee)}</span>
+          <span>{formatDual(toNative(purchaseFee), purchaseFee, currency)}</span>
         </div>
         <div className="total-row">
           <span>Verkaufsgebühren (Schätzung)</span>
-          <span>{formatCurrency(sellFee)}</span>
+          <span>{formatDual(toNative(sellFee), sellFee, currency)}</span>
         </div>
         <div className="total-row total-row-final">
           <span>Gesamtkaufpreis</span>
-          <span>{formatCurrency(totalCost)}</span>
+          <span>{formatDual(toNative(totalCost), totalCost, currency)}</span>
         </div>
       </div>
 

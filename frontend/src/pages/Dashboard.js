@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import AddPositionForm from '../components/AddPositionForm';
 import PositionDetailModal from '../components/PositionDetailModal';
+import { normalizeQuote, formatAmount } from '../utils/currency';
 import './Dashboard.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-const formatCurrency = (value) =>
-  Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -17,12 +15,25 @@ const Dashboard = () => {
 
   const [positions, setPositions] = useState([]);
   const [quotes, setQuotes] = useState({});
+  const [fxRates, setFxRates] = useState({});
   const [quotesUpdatedAt, setQuotesUpdatedAt] = useState(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const [showEur, setShowEur] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  const fxRatesRef = useRef({});
+  useEffect(() => { fxRatesRef.current = fxRates; }, [fxRates]);
+
+  // EUR-equivalent of a {price, currency} quote, using the cached FX rate (native units per 1 EUR)
+  const priceInEur = useCallback((quote) => {
+    if (!quote) return null;
+    if (quote.currency === 'EUR') return quote.price;
+    const rate = fxRatesRef.current[quote.currency];
+    return rate ? quote.price / rate : null;
+  }, []);
 
   const loadQuotes = useCallback(async (posArr) => {
     const results = await Promise.allSettled(
@@ -31,13 +42,37 @@ const Dashboard = () => {
       )
     );
     const map = {};
+    const currenciesNeeded = new Set();
     results.forEach((r, i) => {
-      if (r.status === 'fulfilled') {
-        map[posArr[i].id] = r.value.data.quote?.price ?? null;
+      const q = r.status === 'fulfilled' ? r.value.data.quote : null;
+      if (q && q.price != null) {
+        const normalized = normalizeQuote(q.price, q.currency);
+        map[posArr[i].id] = normalized;
+        if (normalized.currency !== 'EUR') currenciesNeeded.add(normalized.currency);
+      } else {
+        map[posArr[i].id] = null;
       }
     });
     setQuotes(map);
     setQuotesUpdatedAt(new Date());
+
+    const toFetch = [...currenciesNeeded].filter((c) => !fxRatesRef.current[c]);
+    if (toFetch.length > 0) {
+      // Note: the backend doesn't URL-decode query params, so '=' must be sent
+      // unencoded here (encodeURIComponent would turn it into %3D and 404).
+      const fxResults = await Promise.allSettled(
+        toFetch.map((c) => axios.get(`${API_URL}/stocks/quote?symbol=EUR${c}=X`))
+      );
+      const newRates = {};
+      fxResults.forEach((r, i) => {
+        const rate = r.status === 'fulfilled' ? r.value.data.quote?.price : null;
+        if (rate && rate > 0) newRates[toFetch[i]] = rate;
+      });
+      if (Object.keys(newRates).length > 0) {
+        fxRatesRef.current = { ...fxRatesRef.current, ...newRates };
+        setFxRates((prev) => ({ ...prev, ...newRates }));
+      }
+    }
   }, []);
 
   const loadPositions = useCallback(async () => {
@@ -73,8 +108,10 @@ const Dashboard = () => {
   useEffect(() => {
     if (positions.length === 0 || Object.keys(quotes).length === 0) return;
     const toNotify = positions.filter((p) => {
-      if (p.ts_notification_sent || quotes[p.id] == null) return false;
-      const price = quotes[p.id];
+      const quote = quotes[p.id];
+      if (p.ts_notification_sent || quote == null) return false;
+      const price = priceInEur(quote);
+      if (price == null) return false;
       const acq = p.purchase_cost + (p.purchase_fee || 0);
       const sfpd = (p.sell_fee_percent || 0) / 100;
       const sff = p.sell_fee_fixed || 0;
@@ -88,7 +125,7 @@ const Dashboard = () => {
     Promise.allSettled(
       toNotify.map((p) =>
         axios.post(`${API_URL}/positions/${p.id}/notify-trailing-stop`, {
-          current_price: quotes[p.id],
+          current_price: priceInEur(quotes[p.id]),
           ticker: p.ticker,
           name: p.name,
         })
@@ -140,7 +177,12 @@ const Dashboard = () => {
       {selectedPosition && (
         <PositionDetailModal
           position={selectedPosition}
-          currentPrice={quotes[selectedPosition.id] ?? null}
+          quote={quotes[selectedPosition.id] ?? null}
+          fxRate={
+            quotes[selectedPosition.id] && quotes[selectedPosition.id].currency !== 'EUR'
+              ? fxRates[quotes[selectedPosition.id].currency]
+              : 1
+          }
           onClose={() => setSelectedPosition(null)}
         />
       )}
@@ -186,6 +228,13 @@ const Dashboard = () => {
               >
                 ⟳ Auto-Update {autoUpdate ? 'an' : 'aus'}
               </button>
+              <button
+                className="btn-currency-toggle"
+                onClick={() => setShowEur((v) => !v)}
+                title={showEur ? 'Originalwährung anzeigen' : 'Alle Werte in € anzeigen'}
+              >
+                {showEur ? '→ Original' : '→ €'}
+              </button>
               {quotesUpdatedAt && (
                 <span className="quotes-updated">
                   Kurse aktualisiert: {quotesUpdatedAt.toLocaleTimeString('de-DE')}
@@ -219,7 +268,15 @@ const Dashboard = () => {
                       ? position.purchase_cost / position.quantity
                       : 0;
                     const acquisitionCost = position.purchase_cost + position.purchase_fee;
-                    const currentPrice = quotes[position.id] ?? null;
+
+                    const quote = quotes[position.id] ?? null;
+                    const nativeCurrency = quote?.currency || 'EUR';
+                    const fxRate = nativeCurrency === 'EUR' ? 1 : fxRates[nativeCurrency];
+                    const currentPrice = priceInEur(quote);
+
+                    // EUR-baseline value -> stock's native currency, using the cached FX rate
+                    const toNative = (v) => (v == null) ? null : (nativeCurrency === 'EUR' ? v : (fxRate ? v * fxRate : null));
+
                     const pct = currentPrice !== null && kurs > 0
                       ? ((currentPrice - kurs) / kurs) * 100
                       : null;
@@ -253,7 +310,6 @@ const Dashboard = () => {
 
                     let rowClass = '';
                     if (currentPrice !== null && netProfit !== null) {
-                      const grossProfit = currentPrice * position.quantity - position.purchase_cost;
                       if (acquisitionCost > 0 && netProfit / acquisitionCost >= 0.01) rowClass = 'row-blue';
                       else if (netProfit >= 0) rowClass = 'row-green';
                       else rowClass = 'row-red';
@@ -266,15 +322,15 @@ const Dashboard = () => {
                           <td className="ticker">{position.ticker}</td>
                           <td>{position.name}</td>
                           <td>{position.quantity}</td>
-                          <td>{formatCurrency(kurs)}</td>
-                          <td className="total">{formatCurrency(acquisitionCost)}</td>
-                          <td>{currentPrice !== null ? formatCurrency(currentPrice) : '…'}</td>
+                          <td>{formatAmount(toNative(kurs), kurs, nativeCurrency, showEur)}</td>
+                          <td className="total">{formatAmount(toNative(acquisitionCost), acquisitionCost, nativeCurrency, showEur)}</td>
+                          <td>{formatAmount(quote?.price ?? null, currentPrice, nativeCurrency, showEur)}</td>
                           <td className={pct === null ? '' : pct >= 0 ? 'gain' : 'loss'}>
                             {pct === null ? '…' : `${pct >= 0 ? '+' : ''}${pct.toFixed(2)} %`}
                           </td>
-                          <td>{netProceeds === null ? '…' : `${formatCurrency(netProceeds)} €`}</td>
+                          <td>{formatAmount(toNative(netProceeds), netProceeds, nativeCurrency, showEur)}</td>
                           <td className={netProfit === null ? '' : netProfit >= 0 ? 'gain' : 'loss'}>
-                            {netProfit === null ? '…' : `${netProfit >= 0 ? '+' : ''}${formatCurrency(netProfit)} €`}
+                            {formatAmount(toNative(netProfit), netProfit, nativeCurrency, showEur, 2, true)}
                           </td>
                           <td className={netProfit === null ? '' : netProfit >= 0 ? 'gain' : 'loss'}>
                             {netProfit === null || acquisitionCost <= 0 ? '…' : `${netProfit >= 0 ? '+' : ''}${((netProfit / acquisitionCost) * 100).toFixed(2)} %`}
@@ -296,12 +352,12 @@ const Dashboard = () => {
                           <td colSpan="12">
                             <span className="fee-group">
                               <span className="fee-label">Kauf</span>
-                              {formatCurrency(position.purchase_fee_fixed)} € fix · {fmtPct(position.purchase_fee_percent)} · {formatCurrency(position.purchase_fee)} € ges.
+                              {formatAmount(toNative(position.purchase_fee_fixed), position.purchase_fee_fixed, nativeCurrency, showEur)} fix · {fmtPct(position.purchase_fee_percent)} · {formatAmount(toNative(position.purchase_fee), position.purchase_fee, nativeCurrency, showEur)} ges.
                             </span>
                             <span className="fee-sep">|</span>
                             <span className="fee-group">
                               <span className="fee-label">Verkauf</span>
-                              {formatCurrency(position.sell_fee_fixed)} € fix · {fmtPct(position.sell_fee_percent)} · {formatCurrency(position.sell_fee)} € ges.
+                              {formatAmount(toNative(position.sell_fee_fixed), position.sell_fee_fixed, nativeCurrency, showEur)} fix · {fmtPct(position.sell_fee_percent)} · {formatAmount(toNative(position.sell_fee), position.sell_fee, nativeCurrency, showEur)} ges.
                             </span>
                             <span className="fee-sep">|</span>
                             <span className="fee-group">
@@ -313,22 +369,22 @@ const Dashboard = () => {
                                 <span className="fee-sep">|</span>
                                 <span className={`fee-group${currentPrice !== null && currentPrice >= breakEvenPrice ? ' fee-achieved' : ''}`}>
                                   <span className="fee-label">Break-even</span>
-                                  {formatCurrency(breakEvenPrice)} €
+                                  {formatAmount(toNative(breakEvenPrice), breakEvenPrice, nativeCurrency, showEur)}
                                 </span>
                                 <span className="fee-sep">·</span>
                                 <span className={`fee-group${currentPrice !== null && currentPrice >= targetPrice(0.01) ? ' fee-achieved' : ''}`}>
                                   <span className="fee-label">+1%</span>
-                                  {formatCurrency(targetPrice(0.01))} €
+                                  {formatAmount(toNative(targetPrice(0.01)), targetPrice(0.01), nativeCurrency, showEur)}
                                 </span>
                                 <span className="fee-sep">·</span>
                                 <span className={`fee-group${currentPrice !== null && currentPrice >= targetPrice(0.05) ? ' fee-achieved' : ''}`}>
                                   <span className="fee-label">+5%</span>
-                                  {formatCurrency(targetPrice(0.05))} €
+                                  {formatAmount(toNative(targetPrice(0.05)), targetPrice(0.05), nativeCurrency, showEur)}
                                 </span>
                                 <span className="fee-sep">·</span>
                                 <span className={`fee-group${currentPrice !== null && currentPrice >= targetPrice(0.10) ? ' fee-achieved' : ''}`}>
                                   <span className="fee-label">+10%</span>
-                                  {formatCurrency(targetPrice(0.10))} €
+                                  {formatAmount(toNative(targetPrice(0.10)), targetPrice(0.10), nativeCurrency, showEur)}
                                 </span>
                                 {(() => {
                                   const tsActivation = targetPrice(0.01);
@@ -339,22 +395,22 @@ const Dashboard = () => {
                                       <span className="fee-sep">|</span>
                                       <span className={`fee-group${tsActive ? ' fee-achieved' : ''}`}>
                                         <span className="fee-label">TS ab</span>
-                                        {formatCurrency(tsActivation)} €
+                                        {formatAmount(toNative(tsActivation), tsActivation, nativeCurrency, showEur)}
                                       </span>
                                       <span className="fee-sep">→</span>
                                       <span className={`fee-group${tsActive ? ' fee-ts-stop' : ''}`}>
                                         <span className="fee-label">8 %</span>
-                                        {formatCurrency(stopBase * 0.92)} €
+                                        {formatAmount(toNative(stopBase * 0.92), stopBase * 0.92, nativeCurrency, showEur)}
                                       </span>
                                       <span className="fee-sep">·</span>
                                       <span className={`fee-group${tsActive ? ' fee-ts-stop' : ''}`}>
                                         <span className="fee-label">10 %</span>
-                                        {formatCurrency(stopBase * 0.90)} €
+                                        {formatAmount(toNative(stopBase * 0.90), stopBase * 0.90, nativeCurrency, showEur)}
                                       </span>
                                       <span className="fee-sep">·</span>
                                       <span className={`fee-group${tsActive ? ' fee-ts-stop' : ''}`}>
                                         <span className="fee-label">12 %</span>
-                                        {formatCurrency(stopBase * 0.88)} €
+                                        {formatAmount(toNative(stopBase * 0.88), stopBase * 0.88, nativeCurrency, showEur)}
                                       </span>
                                     </>
                                   );
