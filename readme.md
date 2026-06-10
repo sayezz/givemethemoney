@@ -26,11 +26,10 @@ docker-compose up --build
 ### Access
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:3001/api
-- **Database**: localhost:5432 (credentials in docker-compose.yml)
 
 ### Test Account
 1. Go to http://localhost:3000/register
-2. Create a new account (e.g. test@example.com / TestPassword123)
+1. Go to http://localhost:3000/register
 3. You will be redirected to the dashboard automatically
 
 ## Project Structure

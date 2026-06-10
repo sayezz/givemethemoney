@@ -23,6 +23,12 @@
 *.dll
 *.so.*
 
+# JetBrains IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
 
 # Fortran module files
 *.mod
@@ -51,6 +57,7 @@ cmake_install.cmake
 Makefile
 install_manifest.txt
 compile_commands.json
+package-lock.json
 
 # Temporary files
 *.tmp
