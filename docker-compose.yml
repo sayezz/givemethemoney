@@ -11,7 +11,7 @@ services:
     networks:
       - givemethemoney_net
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: unless-stopped
 
   backend:
@@ -40,7 +40,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "3000:80"
     networks:
       - givemethemoney_net
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "5050:80"
+      - "5051:80"
     depends_on:
       - db
     networks:
