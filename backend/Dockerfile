@@ -13,18 +13,18 @@ RUN apt-get update -o Acquire::Retries=5 \
 
 WORKDIR /build
 
-# Install oatpp
+# Install oatpp (skip building oatpp's own test suite to cut build time)
 RUN git clone --depth 1 --branch 1.3.0 https://github.com/oatpp/oatpp.git \
     && cd oatpp \
     && mkdir build && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DOATPP_BUILD_TESTS=OFF \
     && make -j"$(nproc)" install
 
-# Install oatpp-postgresql
+# Install oatpp-postgresql (tests disabled as well)
 RUN git clone --depth 1 --branch 1.3.0 https://github.com/oatpp/oatpp-postgresql.git \
     && cd oatpp-postgresql \
     && mkdir build && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DOATPP_BUILD_TESTS=OFF \
     && make -j"$(nproc)" install
 
 # Copy and build our application
