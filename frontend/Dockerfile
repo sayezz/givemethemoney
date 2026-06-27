@@ -12,6 +12,8 @@ RUN npm config set fetch-retries 5 \
 
 COPY . .
 
+# Build the SPA to call the API on the same origin; nginx proxies /api to the backend.
+ENV REACT_APP_API_URL=/api
 RUN npm run build
 
 FROM nginx:alpine
