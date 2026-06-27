@@ -1,36 +1,46 @@
+# Production / "customer" configuration.
+# Bare `docker compose up` starts the clean setup: only the frontend is exposed,
+# the database is not reachable from the host, and no admin tooling is included.
+#
+# Developers add the extra tooling (pgAdmin, exposed DB/backend ports) with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: tracker_user
-      POSTGRES_PASSWORD: tracker_password
-      POSTGRES_DB: investment_tracker
+      POSTGRES_USER: ${DB_USER:-tracker_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      POSTGRES_DB: ${DB_NAME:-investment_tracker}
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - givemethemoney_net
-    ports:
-      - "5433:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tracker_user} -d ${DB_NAME:-investment_tracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build: ./backend
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: tracker_user
-      DB_PASSWORD: tracker_password
-      DB_NAME: investment_tracker
-      FMP_API_KEY: ${FMP_API_KEY}
-      AV_API_KEY: ${AV_API_KEY}
-      SMTP_URL: ${SMTP_URL}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-    ports:
-      - "3001:3001"
+      DB_USER: ${DB_USER:-tracker_user}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_NAME: ${DB_NAME:-investment_tracker}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      AV_API_KEY: ${AV_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    # Not published to the host: the frontend reverse-proxies /api internally.
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - givemethemoney_net
     restart: unless-stopped
@@ -41,19 +51,6 @@ services:
       - backend
     ports:
       - "3000:80"
-    networks:
-      - givemethemoney_net
-    restart: unless-stopped
-
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5051:80"
-    depends_on:
-      - db
     networks:
       - givemethemoney_net
     restart: unless-stopped

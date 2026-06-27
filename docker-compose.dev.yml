@@ -1,0 +1,26 @@
+# Developer overlay. Adds tooling and host-exposed ports on top of the clean
+# production configuration. Use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  db:
+    # Expose PostgreSQL to the host for local inspection (psql, GUI clients).
+    ports:
+      - "5433:5432"
+
+  backend:
+    # Expose the API directly for testing without going through the frontend.
+    ports:
+      - "3001:3001"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5051:80"
+    depends_on:
+      - db
+    networks:
+      - givemethemoney_net
+    restart: unless-stopped
