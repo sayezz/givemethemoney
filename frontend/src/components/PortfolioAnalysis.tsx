@@ -4,6 +4,9 @@ import {
   Box, Paper, Typography, Grid, CircularProgress, Divider,
   ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import IconButton from '@mui/material/IconButton';
 import { PieChart } from '@mui/x-charts/PieChart';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { LineChart } from '@mui/x-charts/LineChart';
@@ -33,19 +36,24 @@ const Stat: React.FC<{ label: string; value: string; color?: string }> = ({ labe
   </Paper>
 );
 
-const RANGES: { value: string; label: string }[] = [
-  { value: '1mo', label: '1M' },
-  { value: '3mo', label: '3M' },
-  { value: '6mo', label: '6M' },
-  { value: '1y', label: '1J' },
-  { value: '2y', label: '2J' },
-  { value: '5y', label: '5J' },
-  { value: 'max', label: 'Max' },
+// Window length in trading days (approx 21/month). `points` is the visible
+// width; the full 5y daily buffer is fetched once and we slide a window over it.
+const RANGES: { value: string; label: string; points: number }[] = [
+  { value: '1mo', label: '1M', points: 21 },
+  { value: '3mo', label: '3M', points: 63 },
+  { value: '6mo', label: '6M', points: 126 },
+  { value: '1y', label: '1J', points: 252 },
+  { value: '2y', label: '2J', points: 504 },
+  { value: '5y', label: '5J', points: 1300 },
+  { value: 'max', label: 'Max', points: Number.MAX_SAFE_INTEGER },
 ];
+
+const BUFFER_RANGE = '5y'; // daily history buffer fetched once
 
 const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }) => {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('1y');
+  const [offset, setOffset] = useState(0); // trading days shifted back from latest
   const [txnsByPos, setTxnsByPos] = useState<Record<number, Transaction[]>>({});
   const [historyByPos, setHistoryByPos] = useState<Record<number, PosHistory>>({});
 
@@ -62,7 +70,7 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
       const hist: Record<number, PosHistory> = {};
       await Promise.allSettled(
         positions.map(async (p) => {
-          const r = await axios.get(`${API_URL}/stocks/history`, { params: { symbol: p.ticker, range } });
+          const r = await axios.get(`${API_URL}/stocks/history`, { params: { symbol: p.ticker, range: BUFFER_RANGE } });
           hist[p.id] = { currency: r.data.currency || 'EUR', points: r.data.points || [] };
         })
       );
@@ -70,7 +78,7 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
     } finally {
       setLoading(false);
     }
-  }, [positions, range]);
+  }, [positions]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -116,7 +124,21 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
   const years = earliest ? (Date.now() - earliest.getTime()) / (365 * 86400000) : 0;
   const portfolioCagr = years > 0 ? cagr(invested, currentValue + realized + dividends, years) : null;
 
-  const series = buildValueSeries(positions, txnsByPos, historyByPos, fxRates);
+  const fullSeries = buildValueSeries(positions, txnsByPos, historyByPos, fxRates);
+
+  // Slide a fixed-width window over the full buffer. `offset` shifts back in time.
+  const windowLen = Math.min(RANGES.find((r) => r.value === range)?.points ?? 252, fullSeries.length);
+  const maxOffset = Math.max(0, fullSeries.length - windowLen);
+  const clampedOffset = Math.min(offset, maxOffset);
+  const endIdx = fullSeries.length - clampedOffset;
+  const startIdx = Math.max(0, endIdx - windowLen);
+  const series = fullSeries.slice(startIdx, endIdx);
+
+  const canPanOlder = clampedOffset < maxOffset;   // more history to the left
+  const canPanNewer = clampedOffset > 0;           // not yet at latest
+  const panStep = Math.max(1, Math.floor(windowLen / 2));
+  const panOlder = () => setOffset(Math.min(maxOffset, clampedOffset + panStep));
+  const panNewer = () => setOffset(Math.max(0, clampedOffset - panStep));
 
   // Overlay buy/sell markers on the value line: place a marker on the series
   // value at the first chart date on/after each transaction date.
@@ -178,10 +200,23 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
         <Grid item xs={12}>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} mb={1}>
-              <Typography variant="subtitle2">Depotwert über Zeit (€)</Typography>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Typography variant="subtitle2" sx={{ mr: 1 }}>Depotwert über Zeit (€)</Typography>
+                <IconButton size="small" onClick={panOlder} disabled={!canPanOlder} title="Früherer Zeitraum">
+                  <ChevronLeftIcon fontSize="small" />
+                </IconButton>
+                {series.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ minWidth: 150, textAlign: 'center' }}>
+                    {series[0].date} – {series[series.length - 1].date}
+                  </Typography>
+                )}
+                <IconButton size="small" onClick={panNewer} disabled={!canPanNewer} title="Späterer Zeitraum">
+                  <ChevronRightIcon fontSize="small" />
+                </IconButton>
+              </Box>
               <ToggleButtonGroup
                 size="small" exclusive value={range}
-                onChange={(_e, v) => { if (v) setRange(v); }}
+                onChange={(_e, v) => { if (v) { setRange(v); setOffset(0); } }}
               >
                 {RANGES.map((r) => (
                   <ToggleButton key={r.value} value={r.value} sx={{ px: 1.2, py: 0.2 }}>{r.label}</ToggleButton>
