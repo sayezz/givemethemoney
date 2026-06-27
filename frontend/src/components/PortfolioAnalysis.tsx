@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Box, Paper, Typography, Grid, CircularProgress, Divider,
+  ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { PieChart } from '@mui/x-charts/PieChart';
 import { BarChart } from '@mui/x-charts/BarChart';
@@ -32,8 +33,19 @@ const Stat: React.FC<{ label: string; value: string; color?: string }> = ({ labe
   </Paper>
 );
 
+const RANGES: { value: string; label: string }[] = [
+  { value: '1mo', label: '1M' },
+  { value: '3mo', label: '3M' },
+  { value: '6mo', label: '6M' },
+  { value: '1y', label: '1J' },
+  { value: '2y', label: '2J' },
+  { value: '5y', label: '5J' },
+  { value: 'max', label: 'Max' },
+];
+
 const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }) => {
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState('1y');
   const [txnsByPos, setTxnsByPos] = useState<Record<number, Transaction[]>>({});
   const [historyByPos, setHistoryByPos] = useState<Record<number, PosHistory>>({});
 
@@ -50,7 +62,7 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
       const hist: Record<number, PosHistory> = {};
       await Promise.allSettled(
         positions.map(async (p) => {
-          const r = await axios.get(`${API_URL}/stocks/history`, { params: { symbol: p.ticker, range: '2y' } });
+          const r = await axios.get(`${API_URL}/stocks/history`, { params: { symbol: p.ticker, range } });
           hist[p.id] = { currency: r.data.currency || 'EUR', points: r.data.points || [] };
         })
       );
@@ -58,11 +70,11 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
     } finally {
       setLoading(false);
     }
-  }, [positions]);
+  }, [positions, range]);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) {
+  if (loading && Object.keys(historyByPos).length === 0) {
     return <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>;
   }
 
@@ -106,6 +118,24 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
 
   const series = buildValueSeries(positions, txnsByPos, historyByPos, fxRates);
 
+  // Overlay buy/sell markers on the value line: place a marker on the series
+  // value at the first chart date on/after each transaction date.
+  const buyData: (number | null)[] = series.map(() => null);
+  const sellData: (number | null)[] = series.map(() => null);
+  if (series.length > 0) {
+    for (const list of Object.values(txnsByPos)) {
+      for (const t of list) {
+        if (t.txn_type === 'dividend') continue;
+        let idx = series.findIndex((s) => s.date >= t.txn_date);
+        if (idx < 0) idx = series.length - 1;
+        if (t.txn_type === 'buy') buyData[idx] = series[idx].value;
+        else sellData[idx] = series[idx].value;
+      }
+    }
+  }
+  const hasBuys = buyData.some((v) => v != null);
+  const hasSells = sellData.some((v) => v != null);
+
   return (
     <Box>
       <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
@@ -147,17 +177,31 @@ const PortfolioAnalysis: React.FC<Props> = ({ positions, priceEurById, fxRates }
         </Grid>
         <Grid item xs={12}>
           <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>Depotwert über Zeit (€)</Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} mb={1}>
+              <Typography variant="subtitle2">Depotwert über Zeit (€)</Typography>
+              <ToggleButtonGroup
+                size="small" exclusive value={range}
+                onChange={(_e, v) => { if (v) setRange(v); }}
+              >
+                {RANGES.map((r) => (
+                  <ToggleButton key={r.value} value={r.value} sx={{ px: 1.2, py: 0.2 }}>{r.label}</ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
             {series.length > 1 ? (
               <LineChart
                 height={300}
                 xAxis={[{ scaleType: 'point', data: series.map((s) => s.date) }]}
-                series={[{ data: series.map((s) => Math.round(s.value * 100) / 100), label: 'Depotwert €', area: true, showMark: false }]}
+                series={[
+                  { data: series.map((s) => Math.round(s.value * 100) / 100), label: 'Depotwert €', area: true, showMark: false, color: '#667eea' },
+                  ...(hasBuys ? [{ data: buyData, label: 'Kauf', showMark: true, connectNulls: false, color: '#66bb6a' } as const] : []),
+                  ...(hasSells ? [{ data: sellData, label: 'Verkauf', showMark: true, connectNulls: false, color: '#e57373' } as const] : []),
+                ]}
               />
-            ) : <Typography variant="caption" color="text.secondary">Nicht genügend Verlaufsdaten.</Typography>}
+            ) : <Typography variant="caption" color="text.secondary">Nicht genügend Verlaufsdaten für diesen Zeitraum.</Typography>}
             <Divider sx={{ my: 1 }} />
             <Typography variant="caption" color="text.secondary">
-              Historische Fremdwährungswerte werden mit dem aktuellen Wechselkurs umgerechnet (Näherung).
+              Grüne Punkte = Käufe, rote = Verkäufe. Historische Fremdwährungswerte werden mit dem aktuellen Wechselkurs umgerechnet (Näherung).
             </Typography>
           </Paper>
         </Grid>
