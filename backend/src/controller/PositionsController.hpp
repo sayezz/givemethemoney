@@ -24,7 +24,10 @@ public:
       m_database(database),
       m_positionRepository(std::make_shared<PositionRepository>(database->getExecutor())) {
     const char* secret = std::getenv("JWT_SECRET");
-    m_jwtSecret = secret ? secret : "investment-tracker-dev-secret";
+    if (!secret || std::string(secret).empty()) {
+      throw std::runtime_error("JWT_SECRET environment variable must be set");
+    }
+    m_jwtSecret = secret;
   }
 
   ENDPOINT_INFO(getPositions) {

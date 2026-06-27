@@ -59,7 +59,9 @@ public:
     curl_easy_setopt(curl, CURLOPT_READDATA,      &payload);
     curl_easy_setopt(curl, CURLOPT_UPLOAD,        1L);
     curl_easy_setopt(curl, CURLOPT_USE_SSL,       (long)CURLUSESSL_ALL);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    // Verify the SMTP server's TLS certificate to prevent MITM of credentials.
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT,       15L);
 
     CURLcode res = curl_easy_perform(curl);
