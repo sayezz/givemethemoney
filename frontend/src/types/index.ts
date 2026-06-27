@@ -51,6 +51,18 @@ export interface HistoryPoint {
   close: number;      // native currency
 }
 
+// A broker fee preset (e.g. Trade Republic, Scalable Capital, DEGIRO).
+export interface Broker {
+  id: number;
+  name: string;
+  buy_fee_fixed: number;
+  buy_fee_percent: number;
+  sell_fee_fixed: number;
+  sell_fee_percent: number;
+  tax_rate: number;
+  is_default: boolean;
+}
+
 export interface StockSearchResult {
   symbol: string;
   name: string;

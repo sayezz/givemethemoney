@@ -55,6 +55,35 @@ public:
         "  p.purchase_fee, p.purchase_cost + p.purchase_fee "
         "FROM positions p "
         "WHERE NOT EXISTS (SELECT 1 FROM transactions t WHERE t.position_id = p.id)")
+
+  // --- brokers (fee presets) -------------------------------------------------
+  QUERY(createBrokers,
+        "CREATE TABLE IF NOT EXISTS brokers ("
+        "id SERIAL PRIMARY KEY, "
+        "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+        "name VARCHAR(100) NOT NULL, "
+        "buy_fee_fixed DECIMAL(10,2) NOT NULL DEFAULT 0, "
+        "buy_fee_percent DECIMAL(8,4) NOT NULL DEFAULT 0, "
+        "sell_fee_fixed DECIMAL(10,2) NOT NULL DEFAULT 0, "
+        "sell_fee_percent DECIMAL(8,4) NOT NULL DEFAULT 0, "
+        "tax_rate DECIMAL(5,2) NOT NULL DEFAULT 26.375, "
+        "is_default BOOLEAN NOT NULL DEFAULT FALSE, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+
+  QUERY(indexBrokers,
+        "CREATE INDEX IF NOT EXISTS idx_brokers_user_id ON brokers(user_id)")
+
+  // Seed the three common German brokers for every user that has none yet.
+  // Fee values are approximations and fully editable in the UI.
+  QUERY(seedBrokers,
+        "INSERT INTO brokers (user_id, name, buy_fee_fixed, buy_fee_percent, sell_fee_fixed, sell_fee_percent, tax_rate, is_default) "
+        "SELECT u.id, v.name, v.bf, v.bp, v.sf, v.sp, 26.375, v.def "
+        "FROM users u CROSS JOIN (VALUES "
+        "  ('Trade Republic', 1.00, 0.0, 1.00, 0.0, TRUE), "
+        "  ('Scalable Capital', 0.99, 0.0, 0.99, 0.0, FALSE), "
+        "  ('DEGIRO', 2.00, 0.0, 2.00, 0.0, FALSE) "
+        ") AS v(name, bf, bp, sf, sp, def) "
+        "WHERE NOT EXISTS (SELECT 1 FROM brokers b WHERE b.user_id = u.id AND b.name = v.name)")
 };
 
 #include OATPP_CODEGEN_END(DbClient)

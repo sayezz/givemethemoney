@@ -5,7 +5,7 @@ import {
   FormControl, Alert, CircularProgress, Divider, Paper, List, ListItemButton,
   ListItemText,
 } from '@mui/material';
-import type { StockSearchResult } from '../types';
+import type { StockSearchResult, Broker } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 const fmt = (v: number | null | undefined): string =>
@@ -38,6 +38,27 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
 
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [brokers, setBrokers] = useState<Broker[]>([]);
+  const [brokerId, setBrokerId] = useState<number | ''>('');
+
+  const applyBroker = (b: Broker) => {
+    setFixedFee(String(b.buy_fee_fixed));
+    setPercentFee(String(b.buy_fee_percent));
+    setSellFeeFixed(String(b.sell_fee_fixed));
+    setSellFeePercent(String(b.sell_fee_percent));
+    setTaxRate(String(b.tax_rate));
+  };
+
+  // Load brokers and apply the default's fees up front.
+  useEffect(() => {
+    axios.get(`${API_URL}/brokers`).then(({ data }) => {
+      const list: Broker[] = data.brokers || [];
+      setBrokers(list);
+      const def = list.find((b) => b.is_default) || list[0];
+      if (def) { setBrokerId(def.id); applyBroker(def); }
+    }).catch(() => {});
+  }, []);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -190,6 +211,26 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
           )}
         </Box>
       </Box>
+
+      {brokers.length > 0 && (
+        <FormControl size="small" sx={{ mb: 1, minWidth: 240 }}>
+          <InputLabel>Broker (Gebührenvorlage)</InputLabel>
+          <Select
+            label="Broker (Gebührenvorlage)"
+            value={brokerId}
+            onChange={(e) => {
+              const id = e.target.value as number;
+              setBrokerId(id);
+              const b = brokers.find((x) => x.id === id);
+              if (b) applyBroker(b);
+            }}
+          >
+            {brokers.map((b) => (
+              <MenuItem key={b.id} value={b.id}>{b.name}{b.is_default ? ' ★' : ''}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
 
       <Divider sx={{ my: 1.5 }}><Typography variant="caption">Kaufgebühren</Typography></Divider>
       <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2} mb={2}>
