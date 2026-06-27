@@ -1,13 +1,23 @@
-# Investment Tracker - Self-hosted Portfolio Management
+# Investment Tracker – Self-hosted Portfolio Management
 
-A self-hosted investment tracking system with multi-user support.
+Ein selbst gehostetes System zur Verwaltung von Wertpapierdepots mit
+Mehrbenutzer-Unterstützung.
 
-**Backend: C++ with oatpp Framework | Frontend: React | Database: PostgreSQL**
+**Backend: C++ mit oatpp-Framework | Frontend: React | Datenbank: PostgreSQL**
 
+## Funktionen
 
-## Quickstart with Docker
+- Mehrbenutzerfähig mit Registrierung und Login (JWT-Authentifizierung)
+- Positionen anlegen, verwalten und löschen
+- Live-Kurse über Yahoo Finance, Financial Modeling Prep (FMP) und Alpha Vantage
+- Mehrwährungsfähig (automatische Umrechnung in EUR über Wechselkurse)
+- Berechnung von Gebühren, Steuern, Break-even und Renditezielen
+- Trailing-Stop-Überwachung inkl. optionaler E-Mail-Benachrichtigung
 
-### Prerequisites
+## Schnellstart mit Docker
+
+### Voraussetzungen
+
 - Docker & Docker Compose
 - Git
 
@@ -17,23 +27,29 @@ A self-hosted investment tracking system with multi-user support.
 git clone <repo-url>
 cd givemethemoney
 
-# Start all services (PostgreSQL, C++ Backend, React Frontend)
+# Umgebungsvariablen vorbereiten und Secrets eintragen
+cp .env-example .env
+# .env öffnen und mindestens JWT_SECRET (und ggf. DB_PASSWORD) setzen
+
+# Alle Dienste starten (PostgreSQL, C++-Backend, React-Frontend)
 docker-compose up --build
 ```
 
-**First build takes 3-5 minutes** (oatpp is compiled from source)
+**Der erste Build dauert 3–5 Minuten**, da oatpp aus dem Quellcode kompiliert wird.
 
-### Access
+### Zugriff
+
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001/api
-- **Database**: localhost:5432 (credentials in docker-compose.yml)
+- **Backend-API**: http://localhost:3001/api
+- **Datenbank**: localhost:5432 (Zugangsdaten aus `.env`)
 
-### Test Account
-1. Go to http://localhost:3000/register
-2. Create a new account (e.g. test@example.com / TestPassword123)
-3. You will be redirected to the dashboard automatically
+### Testkonto
 
-## Project Structure
+1. http://localhost:3000/register aufrufen
+2. Ein Konto anlegen (z. B. `test@example.com` / `TestPassword123`)
+3. Nach der Registrierung erfolgt die Weiterleitung zum Dashboard
+
+## Projektstruktur
 
 ```
 givemethemoney/
@@ -41,41 +57,43 @@ givemethemoney/
 │   ├── src/
 │   │   ├── main.cpp
 │   │   ├── dto/
-│   │   │   └── DTOs.hpp               # Request/Response models
+│   │   │   └── DTOs.hpp               # Request-/Response-Modelle
 │   │   ├── controller/
-│   │   │   ├── AuthController.hpp     # Login/Register endpoints
+│   │   │   ├── AuthController.hpp     # Login-/Register-Endpunkte
 │   │   │   ├── PositionsController.hpp
-│   │   │   └── StocksController.hpp   # Stock data endpoints
+│   │   │   └── StocksController.hpp   # Kursdaten-Endpunkte
 │   │   ├── repository/
-│   │   │   ├── UserRepository.hpp     # User DB queries
-│   │   │   └── PositionRepository.hpp # Position DB queries
+│   │   │   ├── UserRepository.hpp     # DB-Abfragen für Benutzer
+│   │   │   └── PositionRepository.hpp # DB-Abfragen für Positionen
 │   │   ├── database/
-│   │   │   ├── Database.hpp           # PostgreSQL connection & retry logic
+│   │   │   ├── Database.hpp           # PostgreSQL-Verbindung & Retry-Logik
 │   │   │   └── Database.cpp
 │   │   └── utils/
-│   │       ├── JwtUtils.hpp           # JWT encoding/decoding
-│   │       ├── PasswordUtils.hpp      # PBKDF2 password hashing
-│   │       ├── EmailUtils.hpp
-│   │       ├── HttpClient.hpp
-│   │       ├── CorsUtils.hpp
+│   │       ├── JwtUtils.hpp           # JWT-Kodierung/-Dekodierung
+│   │       ├── PasswordUtils.hpp      # PBKDF2-Passwort-Hashing
+│   │       ├── EmailUtils.hpp         # SMTP-Versand (Trailing-Stop-Mails)
+│   │       ├── HttpClient.hpp         # HTTP-Client (curl) für Kursanbieter
+│   │       ├── CorsUtils.hpp          # CORS-Header
 │   │       └── JsonParser.hpp
-│   ├── init.sql                       # Database schema
+│   ├── init.sql                       # Datenbankschema
 │   ├── CMakeLists.txt
-│   └── Dockerfile                     # Multi-stage build
+│   └── Dockerfile                     # Mehrstufiger Build
 ├── frontend/
 │   ├── src/
 │   │   ├── App.js
 │   │   ├── index.js
 │   │   ├── context/
-│   │   │   └── AuthContext.js         # Auth state management
+│   │   │   └── AuthContext.js         # Auth-State-Management
 │   │   ├── pages/
 │   │   │   ├── Login.js
 │   │   │   ├── Register.js
 │   │   │   └── Dashboard.js
-│   │   └── components/
-│   │       ├── AddPositionForm.js
-│   │       ├── PositionDetailModal.js
-│   │       └── ProtectedRoute.js
+│   │   ├── components/
+│   │   │   ├── AddPositionForm.js
+│   │   │   ├── PositionDetailModal.js
+│   │   │   └── ProtectedRoute.js
+│   │   └── utils/
+│   │       └── currency.js            # Währungsformatierung/-umrechnung
 │   ├── public/
 │   ├── package.json
 │   ├── Dockerfile
@@ -83,44 +101,60 @@ givemethemoney/
 └── docker-compose.yml
 ```
 
-## Security
+## Sicherheit
 
-- **Passwords**: PBKDF2 with 100,000 iterations (OpenSSL), salted
-- **JWT Tokens**: HS256, 7-day expiry
-- **Constant-time comparison** for password verification
-- **CORS** configurable in C++ backend
-- **Input validation** on both backend and frontend
-- **PostgreSQL prepared statements** against SQL injection
+- **Passwörter**: PBKDF2-HMAC-SHA256 mit 100.000 Iterationen (OpenSSL), mit Salt
+- **Passwortprüfung**: Vergleich in konstanter Zeit (`CRYPTO_memcmp`)
+- **JWT-Tokens**: HS256, signiert mit `JWT_SECRET`, Ablauf nach 7 Tagen
+- **CORS**: im C++-Backend konfigurierbar
+- **Eingabevalidierung** im Backend und im Frontend
+- **PostgreSQL Prepared Statements** als Schutz gegen SQL-Injection
 
-## Environment Variables
+> **Hinweis:** `JWT_SECRET` muss vor jedem Einsatz auf einen langen, zufälligen
+> Wert gesetzt werden. Wird kein Secret gesetzt, ist die Token-Signierung nicht
+> sicher. Einen Wert erzeugen z. B. mit `openssl rand -base64 48`.
 
-Defined in `docker-compose.yml`:
+## Umgebungsvariablen
+
+In `.env` definiert (Vorlage: `.env-example`):
 
 ```env
+# Pflicht
+JWT_SECRET=         # langes, zufälliges Secret für die JWT-Signierung
+DB_PASSWORD=        # Passwort der PostgreSQL-Datenbank
+
+# Optional (mit Standardwerten)
 DB_HOST=postgres
 DB_PORT=5432
 DB_USER=tracker_user
-DB_PASSWORD=tracker_password
 DB_NAME=investment_tracker
-JWT_SECRET=your_super_secret_key   # Change before deploying!
-PORT=3001
+
+# Optionale Kursanbieter / E-Mail-Versand
+FMP_API_KEY=
+AV_API_KEY=
+SMTP_URL=
+SMTP_USER=
+SMTP_PASS=
 ```
 
-## Building Locally (without Docker)
+## Lokaler Build (ohne Docker)
 
 ```bash
 cd backend
 
-# Prerequisites
-sudo apt-get install cmake build-essential libssl-dev libpq-dev
+# Voraussetzungen
+sudo apt-get install cmake build-essential libssl-dev libpq-dev libcurl4-openssl-dev
 
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
-# Executable: ./investment_tracker
+# Ausführbare Datei: ./investment_tracker
 ```
 
-## License
+Zur Laufzeit müssen mindestens `JWT_SECRET` sowie die Datenbankvariablen
+gesetzt sein (siehe oben).
+
+## Lizenz
 
 Apache 2.0
