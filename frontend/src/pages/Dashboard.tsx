@@ -12,8 +12,10 @@ import AddIcon from '@mui/icons-material/Add';
 import LogoutIcon from '@mui/icons-material/Logout';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAuth } from '../context/AuthContext';
+import InsightsIcon from '@mui/icons-material/Insights';
 import AddPositionForm from '../components/AddPositionForm';
 import PositionDetailModal from '../components/PositionDetailModal';
+import PortfolioAnalysis from '../components/PortfolioAnalysis';
 import { normalizeQuote, formatAmount } from '../utils/currency';
 import type { Position, Quote } from '../types';
 
@@ -32,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [quotesUpdatedAt, setQuotesUpdatedAt] = useState<Date | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [showEur, setShowEur] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -226,12 +229,28 @@ const Dashboard: React.FC = () => {
               <Button size="small" startIcon={<RefreshIcon />} onClick={() => loadQuotes(positions)}>
                 Aktualisieren
               </Button>
+              <Button size="small" variant={showAnalysis ? 'contained' : 'outlined'} startIcon={<InsightsIcon />} onClick={() => setShowAnalysis((v) => !v)}>
+                Analyse
+              </Button>
               {quotesUpdatedAt && (
                 <Typography variant="caption" color="text.secondary">
                   Kurse: {quotesUpdatedAt.toLocaleTimeString('de-DE')}
                 </Typography>
               )}
             </Box>
+
+            {showAnalysis && (
+              <Box mb={3}>
+                <PortfolioAnalysis
+                  positions={positions}
+                  priceEurById={positions.reduce((acc, p) => {
+                    acc[p.id] = priceInEur(quotes[p.id] ?? null);
+                    return acc;
+                  }, {} as Record<number, number | null>)}
+                  fxRates={fxRates}
+                />
+              </Box>
+            )}
 
             <TableContainer component={Paper}>
               <Table size="small">

@@ -66,6 +66,9 @@ int main() {
     migrations->backfillPurchaseDate();
     migrations->defaultPurchaseDate();
     migrations->notNullPurchaseDate();
+    migrations->createTransactions();
+    migrations->indexTransactions();
+    migrations->backfillTransactions();
     std::cout << "Schema migrations applied." << std::endl;
   }
 

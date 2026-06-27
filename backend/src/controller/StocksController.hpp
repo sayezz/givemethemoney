@@ -14,6 +14,8 @@
 #include <memory>
 #include <cstdlib>
 #include <string>
+#include <ctime>
+#include <algorithm>
 
 #include OATPP_CODEGEN_BEGIN(ApiController)
 
@@ -218,6 +220,63 @@ public:
   }
 
   ENDPOINT("OPTIONS", "/api/stocks/details", optionsDetails) {
+    return createCorsPreflightResponse();
+  }
+
+  // Historical daily closes from Yahoo (for portfolio value-over-time charts).
+  ENDPOINT("GET", "/api/stocks/history", getHistory,
+           REQUEST(std::shared_ptr<IncomingRequest>, request),
+           QUERY(String, symbol),
+           QUERY(String, range, "range", "1y")) {
+    int userId = 0;
+    auto authError = authenticate(request, userId);
+    if (authError) return authError;
+
+    if (!symbol || symbol->empty())
+      return errorResponse(Status::CODE_400, "Query parameter 'symbol' is required");
+
+    std::string rangeStr = range ? std::string(*range) : "1y";
+    auto response = StockHistoryResponseDto::createShared();
+    response->success = true;
+    response->points = oatpp::Vector<oatpp::Object<StockHistoryPointDto>>::createShared();
+
+    try {
+      std::string url = "https://query1.finance.yahoo.com/v8/finance/chart/" + urlEncode(*symbol) +
+                        "?interval=1d&range=" + urlEncode(rangeStr);
+      std::string body = HttpClient::get(url);
+      auto parsed = m_objectMapper->readFromString<oatpp::Object<YahooChartResponseDto>>(body);
+      if (parsed && parsed->chart && parsed->chart->result && parsed->chart->result->size() > 0) {
+        auto res = (*parsed->chart->result)[0];
+        if (res->meta) response->currency = res->meta->currency;
+        if (res->timestamp && res->indicators && res->indicators->quote &&
+            res->indicators->quote->size() > 0) {
+          auto closes = (*res->indicators->quote)[0]->close;
+          auto ts = res->timestamp;
+          if (closes) {
+            v_int32 n = std::min(ts->size(), closes->size());
+            for (v_int32 i = 0; i < n; i++) {
+              auto c = (*closes)[i];
+              if (!c) continue; // skip gaps (holidays etc.)
+              std::time_t t = static_cast<std::time_t>(*(*ts)[i]);
+              std::tm tmv{};
+              gmtime_r(&t, &tmv);
+              char buf[11];
+              std::strftime(buf, sizeof(buf), "%Y-%m-%d", &tmv);
+              auto pt = StockHistoryPointDto::createShared();
+              pt->date = oatpp::String(buf);
+              pt->close = c;
+              response->points->push_back(pt);
+            }
+          }
+        }
+      }
+      return createCorsDtoResponse(Status::CODE_200, response);
+    } catch (const std::exception& e) {
+      return errorResponse(Status::CODE_502, std::string("History fetch failed: ") + e.what());
+    }
+  }
+
+  ENDPOINT("OPTIONS", "/api/stocks/history", optionsHistory) {
     return createCorsPreflightResponse();
   }
 
