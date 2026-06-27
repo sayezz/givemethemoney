@@ -9,6 +9,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import type { Position, StockDetail, Quote, Transaction, TransactionType } from '../types';
 import { positionMetrics } from '../utils/metrics';
+import { buildValueSeries } from '../utils/portfolio';
+import WindowedValueChart from './WindowedValueChart';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -63,6 +65,7 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [txns, setTxns] = useState<Transaction[]>([]);
+  const [history, setHistory] = useState<{ currency: string; points: { date: string; close: number }[] }>({ currency: 'EUR', points: [] });
   const [form, setForm] = useState({
     txn_type: 'buy' as TransactionType,
     txn_date: new Date().toISOString().slice(0, 10),
@@ -84,7 +87,25 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
   };
   useEffect(loadTxns, [position.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    axios.get(`${API_URL}/stocks/history`, { params: { symbol: position.ticker, range: '10y' } })
+      .then((r) => setHistory({ currency: r.data.currency || 'EUR', points: r.data.points || [] }))
+      .catch(() => {});
+  }, [position.ticker]);
+
   const metrics = positionMetrics(txns, currentPrice);
+
+  // Single-position value series (EUR) for the chart.
+  const fxMap: Record<string, number> = (quote && quote.currency !== 'EUR' && fxRate)
+    ? { [quote.currency]: fxRate } : {};
+  const posSeries = buildValueSeries(
+    [position],
+    { [position.id]: txns },
+    { [position.id]: history },
+    fxMap,
+  );
+  const buyDates = txns.filter((t) => t.txn_type === 'buy').map((t) => t.txn_date);
+  const sellDates = txns.filter((t) => t.txn_type === 'sell').map((t) => t.txn_date);
 
   const addTxn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,6 +347,15 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
           <DataRow label="Haltedauer" value={metrics.holdingYears != null ? `${fmt(metrics.holdingYears)} Jahre` : '—'} />
           {metrics.dividendOnCostPct != null && <DataRow label="Dividendenrendite auf Einstand" value={fmtPct(metrics.dividendOnCostPct)} />}
         </Section>
+
+        {/* ── Value over time ─────────────────────────── */}
+        {posSeries.length > 1 && (
+          <Section title="Wertentwicklung (€)">
+            <Box p={1.5}>
+              <WindowedValueChart series={posSeries} buyDates={buyDates} sellDates={sellDates} valueLabel="Positionswert €" height={260} />
+            </Box>
+          </Section>
+        )}
 
         {/* ── Transactions ────────────────────────────── */}
         <Section title="Transaktionen">
