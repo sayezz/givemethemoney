@@ -23,6 +23,7 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
   const [showResults, setShowResults] = useState(false);
 
   const [selectedStock, setSelectedStock] = useState<StockSearchResult | null>(null);
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
@@ -114,6 +115,7 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
         purchase_fee: purchaseFee, purchase_fee_fixed: fixedFeeNum, purchase_fee_percent: percentFeeNum,
         sell_fee: sellFee, sell_fee_fixed: sellFeeFixedNum, sell_fee_percent: sellFeePercentNum,
         tax_rate: taxRateNum, quote_provider: quoteProvider,
+        purchase_date: purchaseDate || undefined,
       });
       onCreated();
     } catch (err: any) {
@@ -158,6 +160,20 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
         {showResults && !searching && searchResults.length === 0 && (
           <Typography variant="caption" color="text.secondary">Keine Treffer gefunden.</Typography>
         )}
+      </Box>
+
+      {/* Purchase date */}
+      <Box mb={2}>
+        <TextField
+          label="Kaufdatum"
+          type="date"
+          value={purchaseDate}
+          onChange={(e) => setPurchaseDate(e.target.value)}
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ max: new Date().toISOString().slice(0, 10) }}
+          sx={{ minWidth: 200 }}
+        />
       </Box>
 
       {/* Quantity & Price */}

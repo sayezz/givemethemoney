@@ -68,6 +68,7 @@ class PositionDto : public oatpp::DTO {
   DTO_FIELD(Boolean, trailing_stop_active);
   DTO_FIELD(Boolean, ts_notification_sent);
   DTO_FIELD(String, quote_provider);
+  DTO_FIELD(String, purchase_date);
   DTO_FIELD(String, created_at);
 };
 

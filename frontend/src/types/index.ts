@@ -21,6 +21,7 @@ export interface Position {
   ts_notification_sent: boolean;
   highest_price?: number | null;
   trailing_stop_percent?: number | null;
+  purchase_date?: string | null;
   created_at: string;
 }
 

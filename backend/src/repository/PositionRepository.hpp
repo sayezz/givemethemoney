@@ -29,17 +29,19 @@ public:
         "trailing_stop_active, "
         "ts_notification_sent, "
         "quote_provider, "
+        "CAST(purchase_date AS text) AS purchase_date, "
         "CAST(created_at AS text) AS created_at "
-        "FROM positions WHERE user_id = :userId ORDER BY created_at DESC",
+        "FROM positions WHERE user_id = :userId ORDER BY purchase_date DESC, created_at DESC",
         PARAM(oatpp::Int32, userId))
 
   QUERY(create,
         "INSERT INTO positions "
-        "(user_id, name, ticker, quantity, purchase_cost, purchase_fee, purchase_fee_fixed, purchase_fee_percent, sell_fee, sell_fee_fixed, sell_fee_percent, tax_rate, quote_provider) "
+        "(user_id, name, ticker, quantity, purchase_cost, purchase_fee, purchase_fee_fixed, purchase_fee_percent, sell_fee, sell_fee_fixed, sell_fee_percent, tax_rate, quote_provider, purchase_date) "
         "VALUES "
         "(:userId, :name, :ticker, CAST(:quantity AS numeric), CAST(:purchaseCost AS numeric), "
         "CAST(:purchaseFee AS numeric), CAST(:purchaseFeeFixed AS numeric), CAST(:purchaseFeePercent AS numeric), "
-        "CAST(:sellFee AS numeric), CAST(:sellFeeFixed AS numeric), CAST(:sellFeePercent AS numeric), CAST(:taxRate AS numeric), :quoteProvider) "
+        "CAST(:sellFee AS numeric), CAST(:sellFeeFixed AS numeric), CAST(:sellFeePercent AS numeric), CAST(:taxRate AS numeric), :quoteProvider, "
+        "COALESCE(CAST(:purchaseDate AS date), CURRENT_DATE)) "
         "RETURNING id, name, ticker, "
         "CAST(quantity AS float8) AS quantity, "
         "CAST(purchase_cost AS float8) AS purchase_cost, "
@@ -55,6 +57,7 @@ public:
         "trailing_stop_active, "
         "ts_notification_sent, "
         "quote_provider, "
+        "CAST(purchase_date AS text) AS purchase_date, "
         "CAST(created_at AS text) AS created_at",
         PARAM(oatpp::Int32, userId),
         PARAM(oatpp::String, name),
@@ -68,7 +71,8 @@ public:
         PARAM(oatpp::Float64, sellFeeFixed),
         PARAM(oatpp::Float64, sellFeePercent),
         PARAM(oatpp::Float64, taxRate),
-        PARAM(oatpp::String, quoteProvider))
+        PARAM(oatpp::String, quoteProvider),
+        PARAM(oatpp::String, purchaseDate))
 
   QUERY(findById,
         "SELECT id, name, ticker, "
@@ -84,6 +88,7 @@ public:
         "CAST(highest_price AS float8) AS highest_price, "
         "CAST(trailing_stop_percent AS float8) AS trailing_stop_percent, "
         "trailing_stop_active, ts_notification_sent, quote_provider, "
+        "CAST(purchase_date AS text) AS purchase_date, "
         "CAST(created_at AS text) AS created_at "
         "FROM positions WHERE id = :id AND user_id = :userId",
         PARAM(oatpp::Int32, id),

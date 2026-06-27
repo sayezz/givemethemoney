@@ -186,6 +186,9 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
           {/* ── Right column ────────────────────────────── */}
           <Grid item xs={12} md={6}>
             <Section title="Dein Investment">
+              {(position.purchase_date || position.created_at) && (
+                <DataRow label="Kaufdatum" value={(position.purchase_date || position.created_at)!.substring(0, 10).split('-').reverse().join('.')} />
+              )}
               <DataRow label="Menge" value={position.quantity} />
               <DataRow label="Kaufkurs / Aktie" value={fmtEur(kurs)} />
               <DataRow label="Kaufpreis gesamt" value={fmtEur(position.purchase_cost)} />

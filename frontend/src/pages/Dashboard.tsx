@@ -155,7 +155,7 @@ const Dashboard: React.FC = () => {
     catch (err: any) { alert(err.response?.data?.message || 'Trailing Stop konnte nicht aktualisiert werden.'); }
   };
 
-  const headers = ['Hinzugefügt', 'Ticker', 'Name', 'Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'Quelle', ''];
+  const headers = ['Kaufdatum', 'Ticker', 'Name', 'Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'Quelle', ''];
   const rightCols = new Set(['Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite']);
   const gainColor = '#81c784';
   const lossColor = '#e57373';
@@ -290,7 +290,10 @@ const Dashboard: React.FC = () => {
                     return (
                       <TableRow key={position.id} hover sx={{ bgcolor: rowBg, cursor: 'pointer' }} onClick={() => setSelectedPosition(position)}>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                          {position.created_at ? position.created_at.substring(0, 10).split('-').reverse().join('.') : ''}
+                          {(() => {
+                            const d = position.purchase_date || position.created_at;
+                            return d ? d.substring(0, 10).split('-').reverse().join('.') : '';
+                          })()}
                         </TableCell>
                         <TableCell><strong>{position.ticker}</strong></TableCell>
                         <TableCell>{position.name}</TableCell>

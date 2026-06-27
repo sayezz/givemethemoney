@@ -10,6 +10,7 @@
 #include "controller/PositionsController.hpp"
 #include "controller/StocksController.hpp"
 #include "database/Database.hpp"
+#include "repository/MigrationRepository.hpp"
 
 #include <curl/curl.h>
 
@@ -57,6 +58,16 @@ int main() {
   OATPP_COMPONENT(std::shared_ptr<oatpp::web::server::HttpRouter>, router);
   OATPP_COMPONENT(std::shared_ptr<oatpp::data::mapping::ObjectMapper>, objectMapper);
   OATPP_COMPONENT(std::shared_ptr<Database>, database);
+
+  // Apply idempotent schema migrations (safe on both fresh and existing DBs).
+  {
+    auto migrations = std::make_shared<MigrationRepository>(database->getExecutor());
+    migrations->addPurchaseDate();
+    migrations->backfillPurchaseDate();
+    migrations->defaultPurchaseDate();
+    migrations->notNullPurchaseDate();
+    std::cout << "Schema migrations applied." << std::endl;
+  }
 
   auto authController = std::make_shared<AuthController>(objectMapper, database);
   auto positionsController = std::make_shared<PositionsController>(objectMapper, database);
