@@ -349,14 +349,14 @@
 }
 
 .fee-achieved {
-  color: #2e7d32;
+  color: #4caf50;
 }
 .fee-achieved .fee-label {
   color: #66bb6a;
 }
 
 .fee-ts-stop {
-  color: #e65100;
+  color: #ff7043;
 }
 .fee-ts-stop .fee-label {
   color: #ffa726;
@@ -364,7 +364,7 @@
 
 .fee-sep {
   margin: 0 10px;
-  color: #ddd;
+  color: rgba(128, 128, 128, 0.6);
 }
 
 .actions-cell {

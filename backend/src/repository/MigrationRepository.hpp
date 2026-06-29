@@ -73,7 +73,7 @@ public:
   QUERY(indexBrokers,
         "CREATE INDEX IF NOT EXISTS idx_brokers_user_id ON brokers(user_id)")
 
-  // Seed the three common German brokers for every user that has none yet.
+  // Seed common German broker presets for every user that doesn't have them yet.
   // Fee values are approximations and fully editable in the UI.
   QUERY(seedBrokers,
         "INSERT INTO brokers (user_id, name, buy_fee_fixed, buy_fee_percent, sell_fee_fixed, sell_fee_percent, tax_rate, is_default) "
@@ -81,7 +81,9 @@ public:
         "FROM users u CROSS JOIN (VALUES "
         "  ('Trade Republic', 1.00, 0.0, 1.00, 0.0, TRUE), "
         "  ('Scalable Capital', 0.99, 0.0, 0.99, 0.0, FALSE), "
-        "  ('DEGIRO', 2.00, 0.0, 2.00, 0.0, FALSE) "
+        "  ('DEGIRO', 2.00, 0.0, 2.00, 0.0, FALSE), "
+        "  ('ING DiBa', 4.90, 0.25, 4.90, 0.25, FALSE), "
+        "  ('Custom', 0.00, 0.0, 0.00, 0.0, FALSE) "
         ") AS v(name, bf, bp, sf, sp, def) "
         "WHERE NOT EXISTS (SELECT 1 FROM brokers b WHERE b.user_id = u.id AND b.name = v.name)")
 };

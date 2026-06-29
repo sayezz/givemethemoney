@@ -4,14 +4,17 @@ import axios from 'axios';
 import {
   AppBar, Toolbar, Typography, Box, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Button, IconButton, Chip, Alert,
-  CircularProgress, Switch, FormControlLabel, Tooltip, Select,
+  CircularProgress, Switch, FormControlLabel, Tooltip, Select, useTheme,
 } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import LogoutIcon from '@mui/icons-material/Logout';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AddPositionForm from '../components/AddPositionForm';
@@ -21,6 +24,7 @@ import BrokerSettings from '../components/BrokerSettings';
 import { normalizeQuote, formatAmount } from '../utils/currency';
 import { positionMetrics } from '../utils/metrics';
 import type { Position, Quote, Transaction } from '../types';
+import './Dashboard.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -29,6 +33,8 @@ type FxRates = Record<string, number>; // native currency units per 1 EUR
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
+  const { mode, toggleMode } = useThemeMode();
+  const muiTheme = useTheme();
   const navigate = useNavigate();
 
   const [positions, setPositions] = useState<Position[]>([]);
@@ -173,8 +179,9 @@ const Dashboard: React.FC = () => {
 
   const headers = ['Kaufdatum', 'Ticker', 'Name', 'Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'IRR p.a.', 'Quelle', ''];
   const rightCols = new Set(['Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'IRR p.a.']);
-  const gainColor = '#81c784';
-  const lossColor = '#e57373';
+  const gainColor = muiTheme.palette.mode === 'dark' ? '#81c784' : '#2e7d32';
+  const lossColor = muiTheme.palette.mode === 'dark' ? '#e57373' : '#c62828';
+  const fmtPct = (v: number | null | undefined) => `${Number(v || 0).toFixed(2).replace(/\.?0+$/, '')} %`;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -196,6 +203,11 @@ const Dashboard: React.FC = () => {
         <Toolbar>
           <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>💰 Give me the money</Typography>
           <Typography variant="body2" color="text.secondary" mr={2}>{user?.email}</Typography>
+          <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
+            <IconButton color="inherit" onClick={toggleMode}>
+              {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Broker & Standard-Gebühren">
             <IconButton color="inherit" onClick={() => setShowSettings(true)}><SettingsIcon /></IconButton>
           </Tooltip>
@@ -309,6 +321,14 @@ const Dashboard: React.FC = () => {
                       netProfit = netProceeds - acquisitionCost;
                     }
 
+                    const sellDenom = position.quantity * (1 - sellFeePercentDec);
+                    const breakEvenPrice = sellDenom > 0 ? (acquisitionCost + sellFeeFixed) / sellDenom : null;
+                    const targetPrice = (r: number): number | null => {
+                      if (sellDenom <= 0 || taxRateDec >= 1) return null;
+                      const targetNetSale = acquisitionCost * (1 + r - taxRateDec) / (1 - taxRateDec);
+                      return (targetNetSale + sellFeeFixed) / sellDenom;
+                    };
+
                     let rowBg = 'inherit';
                     if (netProfit !== null) {
                       if (acquisitionCost > 0 && netProfit / acquisitionCost >= 0.01) rowBg = 'rgba(21,101,192,0.15)';
@@ -329,51 +349,114 @@ const Dashboard: React.FC = () => {
                     const irrColor = irrPct == null ? 'inherit' : irrPct >= 0 ? gainColor : lossColor;
                     const irrDisplay = irrPct == null ? '…' : `${irrPct >= 0 ? '+' : ''}${irrPct.toFixed(2)} %`;
 
+                    const tsActivation = targetPrice(0.01);
+                    const tsActive = currentPrice !== null && tsActivation !== null && currentPrice >= tsActivation;
+                    const stopBase = tsActive ? currentPrice! : tsActivation;
+
                     return (
-                      <TableRow key={position.id} hover sx={{ bgcolor: rowBg, cursor: 'pointer' }} onClick={() => setSelectedPosition(position)}>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                          {(() => {
-                            const d = position.purchase_date || position.created_at;
-                            return d ? d.substring(0, 10).split('-').reverse().join('.') : '';
-                          })()}
-                        </TableCell>
-                        <TableCell><strong>{position.ticker}</strong></TableCell>
-                        <TableCell>{position.name}</TableCell>
-                        <TableCell align="right">{position.quantity}</TableCell>
-                        <TableCell align="right">{formatAmount(toNative(kurs), kurs, nativeCurrency, showEur)}</TableCell>
-                        <TableCell align="right">{formatAmount(toNative(acquisitionCost), acquisitionCost, nativeCurrency, showEur)}</TableCell>
-                        <TableCell align="right">{formatAmount(quote?.price ?? null, currentPrice, nativeCurrency, showEur)}</TableCell>
-                        <TableCell align="right" sx={{ color: pctColor }}>{pctDisplay}</TableCell>
-                        <TableCell align="right">{formatAmount(toNative(netProceeds), netProceeds, nativeCurrency, showEur)}</TableCell>
-                        <TableCell align="right" sx={{ color: netColor }}>{formatAmount(toNative(netProfit), netProfit, nativeCurrency, showEur, 2, true)}</TableCell>
-                        <TableCell align="right" sx={{ color: netColor }}>{retDisplay}</TableCell>
-                        <TableCell align="right" sx={{ color: irrColor }}>{irrDisplay}</TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Select
-                            native
-                            variant="standard"
-                            value={position.quote_provider || 'yahoo'}
-                            onChange={(e) => handleProviderChange(position.id, e.target.value as string)}
-                            sx={{ fontSize: '0.72rem' }}
-                          >
-                            <option value="yahoo">Yahoo</option>
-                            <option value="fmp">FMP</option>
-                            <option value="alphavantage">AlphaV</option>
-                          </Select>
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()} sx={{ whiteSpace: 'nowrap' }}>
-                          <Tooltip title={position.trailing_stop_active ? 'Trailing Stop aktiv' : 'Trailing Stop inaktiv'}>
-                            <IconButton size="small" color={position.trailing_stop_active ? 'warning' : 'default'} onClick={() => handleToggleTrailingStop(position.id, position.trailing_stop_active)}>
-                              <FlagIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Investment löschen">
-                            <IconButton size="small" color="error" onClick={() => handleDelete(position.id)}>
-                              <CloseIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={position.id}>
+                        <TableRow hover sx={{ bgcolor: rowBg, cursor: 'pointer' }} onClick={() => setSelectedPosition(position)}>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                            {(() => {
+                              const d = position.purchase_date || position.created_at;
+                              return d ? d.substring(0, 10).split('-').reverse().join('.') : '';
+                            })()}
+                          </TableCell>
+                          <TableCell><strong>{position.ticker}</strong></TableCell>
+                          <TableCell>{position.name}</TableCell>
+                          <TableCell align="right">{position.quantity}</TableCell>
+                          <TableCell align="right">{formatAmount(toNative(kurs), kurs, nativeCurrency, showEur)}</TableCell>
+                          <TableCell align="right">{formatAmount(toNative(acquisitionCost), acquisitionCost, nativeCurrency, showEur)}</TableCell>
+                          <TableCell align="right">{formatAmount(quote?.price ?? null, currentPrice, nativeCurrency, showEur)}</TableCell>
+                          <TableCell align="right" sx={{ color: pctColor }}>{pctDisplay}</TableCell>
+                          <TableCell align="right">{formatAmount(toNative(netProceeds), netProceeds, nativeCurrency, showEur)}</TableCell>
+                          <TableCell align="right" sx={{ color: netColor }}>{formatAmount(toNative(netProfit), netProfit, nativeCurrency, showEur, 2, true)}</TableCell>
+                          <TableCell align="right" sx={{ color: netColor }}>{retDisplay}</TableCell>
+                          <TableCell align="right" sx={{ color: irrColor }}>{irrDisplay}</TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              native
+                              variant="standard"
+                              value={position.quote_provider || 'yahoo'}
+                              onChange={(e) => handleProviderChange(position.id, e.target.value as string)}
+                              sx={{ fontSize: '0.72rem' }}
+                            >
+                              <option value="yahoo">Yahoo</option>
+                              <option value="fmp">FMP</option>
+                              <option value="alphavantage">AlphaV</option>
+                            </Select>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()} sx={{ whiteSpace: 'nowrap' }}>
+                            <Tooltip title={position.trailing_stop_active ? 'Trailing Stop aktiv' : 'Trailing Stop inaktiv'}>
+                              <IconButton size="small" color={position.trailing_stop_active ? 'warning' : 'default'} onClick={() => handleToggleTrailingStop(position.id, position.trailing_stop_active)}>
+                                <FlagIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Investment löschen">
+                              <IconButton size="small" color="error" onClick={() => handleDelete(position.id)}>
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow sx={{ bgcolor: rowBg }} onClick={() => setSelectedPosition(position)}>
+                          <TableCell colSpan={14} sx={{ pt: 0, pb: '6px', borderTop: 'none', fontSize: '0.72rem', color: 'text.disabled', cursor: 'pointer' }}>
+                            <span className="fee-group">
+                              <span className="fee-label">Kauf</span>
+                              {formatAmount(toNative(position.purchase_fee_fixed), position.purchase_fee_fixed, nativeCurrency, showEur)} fix · {fmtPct(position.purchase_fee_percent)} · {formatAmount(toNative(position.purchase_fee), position.purchase_fee, nativeCurrency, showEur)} ges.
+                            </span>
+                            <span className="fee-sep">|</span>
+                            <span className="fee-group">
+                              <span className="fee-label">Verkauf</span>
+                              {formatAmount(toNative(position.sell_fee_fixed), position.sell_fee_fixed, nativeCurrency, showEur)} fix · {fmtPct(position.sell_fee_percent)} · {formatAmount(toNative(position.sell_fee), position.sell_fee, nativeCurrency, showEur)} ges.
+                            </span>
+                            <span className="fee-sep">|</span>
+                            <span className="fee-group">
+                              <span className="fee-label">Steuer</span>
+                              {fmtPct(position.tax_rate)}
+                            </span>
+                            {breakEvenPrice !== null && (
+                              <>
+                                <span className="fee-sep">|</span>
+                                <span className={`fee-group${currentPrice !== null && currentPrice >= breakEvenPrice ? ' fee-achieved' : ''}`}>
+                                  <span className="fee-label">Break-even</span>
+                                  {formatAmount(toNative(breakEvenPrice), breakEvenPrice, nativeCurrency, showEur)}
+                                </span>
+                                {([0.01, 0.05, 0.10] as const).map((r) => {
+                                  const tp = targetPrice(r);
+                                  return tp !== null ? (
+                                    <React.Fragment key={r}>
+                                      <span className="fee-sep">·</span>
+                                      <span className={`fee-group${currentPrice !== null && currentPrice >= tp ? ' fee-achieved' : ''}`}>
+                                        <span className="fee-label">+{r * 100}%</span>
+                                        {formatAmount(toNative(tp), tp, nativeCurrency, showEur)}
+                                      </span>
+                                    </React.Fragment>
+                                  ) : null;
+                                })}
+                                {tsActivation !== null && stopBase !== null && (
+                                  <>
+                                    <span className="fee-sep">|</span>
+                                    <span className={`fee-group${tsActive ? ' fee-achieved' : ''}`}>
+                                      <span className="fee-label">TS ab</span>
+                                      {formatAmount(toNative(tsActivation), tsActivation, nativeCurrency, showEur)}
+                                    </span>
+                                    {([0.08, 0.10, 0.12] as const).map((drop, i) => (
+                                      <React.Fragment key={drop}>
+                                        <span className="fee-sep">{i === 0 ? '→' : '·'}</span>
+                                        <span className={`fee-group${tsActive ? ' fee-ts-stop' : ''}`}>
+                                          <span className="fee-label">{drop * 100}%</span>
+                                          {formatAmount(toNative(stopBase * (1 - drop)), stopBase * (1 - drop), nativeCurrency, showEur)}
+                                        </span>
+                                      </React.Fragment>
+                                    ))}
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>

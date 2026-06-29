@@ -80,7 +80,9 @@ public:
         "FROM (VALUES "
         "  ('Trade Republic', 1.00, 0.0, 1.00, 0.0, TRUE), "
         "  ('Scalable Capital', 0.99, 0.0, 0.99, 0.0, FALSE), "
-        "  ('DEGIRO', 2.00, 0.0, 2.00, 0.0, FALSE) "
+        "  ('DEGIRO', 2.00, 0.0, 2.00, 0.0, FALSE), "
+        "  ('ING DiBa', 4.90, 0.25, 4.90, 0.25, FALSE), "
+        "  ('Custom', 0.00, 0.0, 0.00, 0.0, FALSE) "
         ") AS v(name, bf, bp, sf, sp, def) "
         "WHERE NOT EXISTS (SELECT 1 FROM brokers b WHERE b.user_id = :userId AND b.name = v.name)",
         PARAM(oatpp::Int32, userId))

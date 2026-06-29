@@ -154,47 +154,55 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
       <Typography variant="h6" mb={2}>Investment hinzufügen</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Stock search */}
-      <Box mb={2} position="relative">
-        <TextField
-          label="Aktie suchen (Name, Symbol, ISIN, WKN)"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setSelectedStock(null); }}
-          onFocus={() => searchResults.length > 0 && setShowResults(true)}
-          fullWidth size="small" autoComplete="off"
-          InputProps={{ endAdornment: searching ? <CircularProgress size={16} /> : null }}
-        />
-        {showResults && searchResults.length > 0 && (
-          <Paper sx={{ position: 'absolute', zIndex: 10, width: '100%', maxHeight: 240, overflow: 'auto' }}>
-            <List dense disablePadding>
-              {searchResults.map((s) => (
-                <ListItemButton key={s.symbol} onClick={() => selectStock(s)}>
-                  <ListItemText
-                    primary={<><strong>{s.symbol}</strong> — {s.name}</>}
-                    secondary={s.exchange}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          </Paper>
-        )}
-        {showResults && !searching && searchResults.length === 0 && (
-          <Typography variant="caption" color="text.secondary">Keine Treffer gefunden.</Typography>
-        )}
-      </Box>
+      {/* Top row: stock search, purchase date, quote provider */}
+      <Box display="grid" gridTemplateColumns="2fr 1fr 1fr" gap={2} mb={2} alignItems="flex-start">
+        <Box position="relative">
+          <TextField
+            label="Aktie suchen (Name, Symbol, ISIN, WKN)"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelectedStock(null); }}
+            onFocus={() => searchResults.length > 0 && setShowResults(true)}
+            fullWidth size="small" autoComplete="off"
+            InputProps={{ endAdornment: searching ? <CircularProgress size={16} /> : null }}
+          />
+          {showResults && searchResults.length > 0 && (
+            <Paper sx={{ position: 'absolute', zIndex: 10, width: '100%', maxHeight: 240, overflow: 'auto' }}>
+              <List dense disablePadding>
+                {searchResults.map((s) => (
+                  <ListItemButton key={s.symbol} onClick={() => selectStock(s)}>
+                    <ListItemText
+                      primary={<><strong>{s.symbol}</strong> — {s.name}</>}
+                      secondary={s.exchange}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Paper>
+          )}
+          {showResults && !searching && searchResults.length === 0 && (
+            <Typography variant="caption" color="text.secondary">Keine Treffer gefunden.</Typography>
+          )}
+        </Box>
 
-      {/* Purchase date */}
-      <Box mb={2}>
         <TextField
           label="Kaufdatum"
           type="date"
           value={purchaseDate}
           onChange={(e) => setPurchaseDate(e.target.value)}
           size="small"
+          fullWidth
           InputLabelProps={{ shrink: true }}
           inputProps={{ max: new Date().toISOString().slice(0, 10) }}
-          sx={{ minWidth: 200 }}
         />
+
+        <FormControl size="small" fullWidth>
+          <InputLabel>Kursanbieter</InputLabel>
+          <Select value={quoteProvider} label="Kursanbieter" onChange={(e) => setQuoteProvider(e.target.value)}>
+            <MenuItem value="yahoo">Yahoo Finance</MenuItem>
+            <MenuItem value="fmp">Financial Modeling Prep (FMP)</MenuItem>
+            <MenuItem value="alphavantage">Alpha Vantage (25 req/Tag)</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       {/* Quantity & Price */}
@@ -232,28 +240,19 @@ const AddPositionForm: React.FC<Props> = ({ onCreated, onCancel }) => {
         </FormControl>
       )}
 
-      <Divider sx={{ my: 1.5 }}><Typography variant="caption">Kaufgebühren</Typography></Divider>
+      <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 2, mb: 1 }}>Kaufgebühren</Typography>
       <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2} mb={2}>
         {numField('Ordergebühr fix (€)', fixedFee, setFixedFee)}
         {numField('Ordergebühr (%)', percentFee, setPercentFee)}
       </Box>
 
-      <Divider sx={{ my: 1.5 }}><Typography variant="caption">Verkaufsgebühren & Steuer</Typography></Divider>
+      <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 2, mb: 1 }}>Verkaufsgebühren & Steuern</Typography>
       <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} mb={2}>
         {numField('Ordergebühr fix (€)', sellFeeFixed, setSellFeeFixed)}
         {numField('Ordergebühr (%)', sellFeePercent, setSellFeePercent)}
         {numField('Abgeltungssteuer (%)', taxRate, setTaxRate)}
       </Box>
 
-      <Divider sx={{ my: 1.5 }}><Typography variant="caption">Datenquelle</Typography></Divider>
-      <FormControl size="small" sx={{ mb: 2, minWidth: 240 }}>
-        <InputLabel>Kursanbieter</InputLabel>
-        <Select value={quoteProvider} label="Kursanbieter" onChange={(e) => setQuoteProvider(e.target.value)}>
-          <MenuItem value="yahoo">Yahoo Finance</MenuItem>
-          <MenuItem value="fmp">Financial Modeling Prep (FMP)</MenuItem>
-          <MenuItem value="alphavantage">Alpha Vantage (25 req/Tag)</MenuItem>
-        </Select>
-      </FormControl>
 
       {/* Summary */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
