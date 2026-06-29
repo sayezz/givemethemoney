@@ -72,6 +72,42 @@ class PositionDto : public oatpp::DTO {
   DTO_FIELD(String, created_at);
 };
 
+class BrokerDto : public oatpp::DTO {
+  DTO_INIT(BrokerDto, DTO)
+  DTO_FIELD(Int32, id);
+  DTO_FIELD(String, name);
+  DTO_FIELD(Float64, buy_fee_fixed);
+  DTO_FIELD(Float64, buy_fee_percent);
+  DTO_FIELD(Float64, sell_fee_fixed);
+  DTO_FIELD(Float64, sell_fee_percent);
+  DTO_FIELD(Float64, tax_rate);
+  DTO_FIELD(Boolean, is_default);
+};
+
+class BrokerRequestDto : public oatpp::DTO {
+  DTO_INIT(BrokerRequestDto, DTO)
+  DTO_FIELD(String, name);
+  DTO_FIELD(Float64, buy_fee_fixed);
+  DTO_FIELD(Float64, buy_fee_percent);
+  DTO_FIELD(Float64, sell_fee_fixed);
+  DTO_FIELD(Float64, sell_fee_percent);
+  DTO_FIELD(Float64, tax_rate);
+  DTO_FIELD(Boolean, is_default);
+};
+
+class BrokersListResponseDto : public oatpp::DTO {
+  DTO_INIT(BrokersListResponseDto, DTO)
+  DTO_FIELD(Boolean, success);
+  DTO_FIELD(Vector<Object<BrokerDto>>, brokers);
+};
+
+class BrokerResponseDto : public oatpp::DTO {
+  DTO_INIT(BrokerResponseDto, DTO)
+  DTO_FIELD(Boolean, success);
+  DTO_FIELD(String, message);
+  DTO_FIELD(Object<BrokerDto>, broker);
+};
+
 class TransactionDto : public oatpp::DTO {
   DTO_INIT(TransactionDto, DTO)
   DTO_FIELD(Int32, id);

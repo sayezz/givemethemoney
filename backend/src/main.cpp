@@ -9,6 +9,7 @@
 #include "controller/AuthController.hpp"
 #include "controller/PositionsController.hpp"
 #include "controller/StocksController.hpp"
+#include "controller/BrokersController.hpp"
 #include "database/Database.hpp"
 #include "repository/MigrationRepository.hpp"
 
@@ -78,16 +79,21 @@ int main() {
     migrations->createTransactions();
     migrations->indexTransactions();
     migrations->backfillTransactions();
+    migrations->createBrokers();
+    migrations->indexBrokers();
+    migrations->seedBrokers();
     std::cout << "Schema migrations applied." << std::endl;
   }
 
   auto authController = std::make_shared<AuthController>(objectMapper, database);
   auto positionsController = std::make_shared<PositionsController>(objectMapper, database);
   auto stocksController = std::make_shared<StocksController>(objectMapper);
+  auto brokersController = std::make_shared<BrokersController>(objectMapper, database);
 
   router->addController(authController);
   router->addController(positionsController);
   router->addController(stocksController);
+  router->addController(brokersController);
 
   OATPP_COMPONENT(std::shared_ptr<oatpp::network::ServerConnectionProvider>, connectionProvider);
   OATPP_COMPONENT(std::shared_ptr<oatpp::network::ConnectionHandler>, connectionHandler);

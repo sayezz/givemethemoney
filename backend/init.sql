@@ -32,6 +32,20 @@ CREATE TABLE positions (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Brokers Table (per-user fee presets, e.g. Trade Republic, Scalable, DEGIRO)
+CREATE TABLE brokers (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  buy_fee_fixed DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  buy_fee_percent DECIMAL(8, 4) NOT NULL DEFAULT 0,
+  sell_fee_fixed DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  sell_fee_percent DECIMAL(8, 4) NOT NULL DEFAULT 0,
+  tax_rate DECIMAL(5, 2) NOT NULL DEFAULT 26.375,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Transactions Table (dated cash flows per position: buy / sell / dividend)
 CREATE TABLE transactions (
   id SERIAL PRIMARY KEY,
@@ -49,6 +63,7 @@ CREATE TABLE transactions (
 CREATE INDEX idx_positions_user_id ON positions(user_id);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_transactions_position_id ON transactions(position_id);
+CREATE INDEX idx_brokers_user_id ON brokers(user_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

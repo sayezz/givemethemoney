@@ -13,9 +13,11 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAuth } from '../context/AuthContext';
 import InsightsIcon from '@mui/icons-material/Insights';
+import SettingsIcon from '@mui/icons-material/Settings';
 import AddPositionForm from '../components/AddPositionForm';
 import PositionDetailModal from '../components/PositionDetailModal';
 import PortfolioAnalysis from '../components/PortfolioAnalysis';
+import BrokerSettings from '../components/BrokerSettings';
 import { normalizeQuote, formatAmount } from '../utils/currency';
 import { positionMetrics } from '../utils/metrics';
 import type { Position, Quote, Transaction } from '../types';
@@ -37,6 +39,7 @@ const Dashboard: React.FC = () => {
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [showEur, setShowEur] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -175,6 +178,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      {showSettings && <BrokerSettings onClose={() => setShowSettings(false)} />}
       {selectedPosition && (
         <PositionDetailModal
           position={selectedPosition}
@@ -192,6 +196,9 @@ const Dashboard: React.FC = () => {
         <Toolbar>
           <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>💰 Give me the money</Typography>
           <Typography variant="body2" color="text.secondary" mr={2}>{user?.email}</Typography>
+          <Tooltip title="Broker & Standard-Gebühren">
+            <IconButton color="inherit" onClick={() => setShowSettings(true)}><SettingsIcon /></IconButton>
+          </Tooltip>
           <Button startIcon={<LogoutIcon />} color="inherit" onClick={handleLogout}>Logout</Button>
         </Toolbar>
       </AppBar>

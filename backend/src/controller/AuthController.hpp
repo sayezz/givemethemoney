@@ -7,6 +7,7 @@
 #include "../dto/DTOs.hpp"
 #include "../database/Database.hpp"
 #include "../repository/UserRepository.hpp"
+#include "../repository/BrokerRepository.hpp"
 #include "../utils/CorsUtils.hpp"
 #include "../utils/PasswordUtils.hpp"
 #include "../utils/JwtUtils.hpp"
@@ -21,7 +22,8 @@ public:
                  std::shared_ptr<Database> database)
     : oatpp::web::server::api::ApiController(objectMapper),
       m_database(database),
-      m_userRepository(std::make_shared<UserRepository>(database->getExecutor())) {
+      m_userRepository(std::make_shared<UserRepository>(database->getExecutor())),
+      m_brokerRepository(std::make_shared<BrokerRepository>(database->getExecutor())) {
     const char* secret = std::getenv("JWT_SECRET");
     if (!secret || std::string(secret).empty()) {
       throw std::runtime_error("JWT_SECRET environment variable must be set");
@@ -60,6 +62,9 @@ public:
       return errorResponse(Status::CODE_400, "Failed to create user");
     }
     auto user = createdRows[0];
+
+    // Seed the standard broker fee presets for the new user.
+    m_brokerRepository->seedForUser(user->id);
 
     std::string token = JwtUtils::encode(*user->id, *user->email, m_jwtSecret);
 
@@ -144,6 +149,7 @@ private:
 
   std::shared_ptr<Database> m_database;
   std::shared_ptr<UserRepository> m_userRepository;
+  std::shared_ptr<BrokerRepository> m_brokerRepository;
   std::string m_jwtSecret;
 };
 
