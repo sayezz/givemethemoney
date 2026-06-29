@@ -37,7 +37,7 @@ const Login: React.FC = () => {
     >
       <Paper elevation={8} sx={{ p: 5, width: '100%', maxWidth: 420, borderRadius: 3 }}>
         <Typography variant="h4" fontWeight={700} textAlign="center" mb={3}>
-          Give Me The Money 💰
+          Give Me The Money
         </Typography>
         <Typography variant="h6" mb={2}>Login</Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

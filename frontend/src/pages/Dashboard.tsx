@@ -201,7 +201,7 @@ const Dashboard: React.FC = () => {
 
       <AppBar position="static" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar>
-          <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>💰 Give me the money</Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>Give me the money</Typography>
           <Typography variant="body2" color="text.secondary" mr={2}>{user?.email}</Typography>
           <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
             <IconButton color="inherit" onClick={toggleMode}>
