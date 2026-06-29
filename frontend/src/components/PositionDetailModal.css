@@ -125,19 +125,6 @@
 .dr-label { color: #777; flex: 1; white-space: nowrap; }
 .dr-value { color: #222; font-weight: 500; text-align: right; }
 
-.currency-amount {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.25;
-}
-
-.cur-secondary {
-  font-size: 10px;
-  color: #aaa;
-  font-weight: 400;
-}
-
 .dr.dr-accent {
   background: rgba(102, 126, 234, 0.06);
   margin: 4px -4px;
@@ -242,9 +229,6 @@
   font-weight: 700;
   color: #222;
   margin-bottom: 4px;
-}
-.tc-price .currency-amount {
-  align-items: center;
 }
 .target-reached .tc-price { color: #2e7d32; }
 .tc-dist { font-size: 11px; color: #aaa; }

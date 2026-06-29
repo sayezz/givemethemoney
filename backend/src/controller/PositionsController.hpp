@@ -96,7 +96,8 @@ public:
       sellFeeFixed,
       sellFeePercent,
       taxRate,
-      quoteProvider
+      quoteProvider,
+      body->purchase_date
     );
 
     if (!result->isSuccess()) {

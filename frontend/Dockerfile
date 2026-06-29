@@ -7,10 +7,12 @@ COPY package*.json ./
 RUN npm config set fetch-retries 5 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
-    && if [ -f package-lock.json ]; then npm ci; else npm install; fi
+    # TypeScript 5 vs. react-scripts 5 peer range: accept the resolution.
+    && if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; else npm install --legacy-peer-deps; fi
 
 COPY . .
 
+# Build the SPA to call the API on the same origin; nginx proxies /api to the backend.
 ENV REACT_APP_API_URL=/api
 RUN npm run build
 

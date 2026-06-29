@@ -22,6 +22,7 @@ CREATE TABLE positions (
   sell_fee_fixed DECIMAL(10, 2) NOT NULL DEFAULT 0,
   sell_fee_percent DECIMAL(8, 4) NOT NULL DEFAULT 0,
   tax_rate DECIMAL(5, 2) NOT NULL DEFAULT 26.375,
+  purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
   quote_provider VARCHAR(20) NOT NULL DEFAULT 'yahoo',
   trailing_stop_active BOOLEAN NOT NULL DEFAULT FALSE,
   ts_notification_sent BOOLEAN NOT NULL DEFAULT FALSE,
