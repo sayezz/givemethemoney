@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: tracker_user
-      POSTGRES_PASSWORD: tracker_password
-      POSTGRES_DB: investment_tracker
+      POSTGRES_USER: ${DB_USER:-tracker_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      POSTGRES_DB: ${DB_NAME:-investment_tracker}
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -19,14 +19,15 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: tracker_user
-      DB_PASSWORD: tracker_password
-      DB_NAME: investment_tracker
-      FMP_API_KEY: ${FMP_API_KEY}
-      AV_API_KEY: ${AV_API_KEY}
-      SMTP_URL: ${SMTP_URL}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
+      DB_USER: ${DB_USER:-tracker_user}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_NAME: ${DB_NAME:-investment_tracker}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      AV_API_KEY: ${AV_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
     ports:
       - "3001:3001"
     depends_on:

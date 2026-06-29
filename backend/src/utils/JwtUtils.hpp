@@ -9,6 +9,7 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#include <openssl/crypto.h>
 #include "oatpp/core/data/stream/BufferStream.hpp"
 #include "oatpp/core/utils/ConversionUtils.hpp"
 
@@ -31,18 +32,35 @@ public:
     auto parts = split(token, '.');
     if (parts.size() != 3) return false;
 
+    // Constant-time signature comparison to avoid timing side channels.
     std::string signature = base64url_encode(hmacSha256(parts[0] + "." + parts[1], secret));
-    if (signature != parts[2]) return false;
+    if (signature.size() != parts[2].size()) return false;
+    if (CRYPTO_memcmp(signature.data(), parts[2].data(), signature.size()) != 0) return false;
 
     // Decode payload (simple JSON parsing)
     std::string payloadJson = base64url_decode(parts[1]);
-    
+
+    // Reject expired tokens. A token without a valid "exp" claim is treated
+    // as invalid rather than valid-forever.
+    size_t expPos = payloadJson.find("\"exp\":");
+    if (expPos == std::string::npos) return false;
+    long expiry = 0;
+    try {
+      expiry = std::stol(payloadJson.substr(expPos + 6));
+    } catch (const std::exception&) {
+      return false;
+    }
+    if (expiry < static_cast<long>(time(nullptr))) return false;
+
     // Extract user ID and email from JSON (simplified)
     size_t idPos = payloadJson.find("\"id\":");
-    if (idPos != std::string::npos) {
+    if (idPos == std::string::npos) return false;
+    try {
       userId = std::stoi(payloadJson.substr(idPos + 5));
+    } catch (const std::exception&) {
+      return false;
     }
-    
+
     size_t emailPos = payloadJson.find("\"email\":\"");
     if (emailPos != std::string::npos) {
       size_t emailEnd = payloadJson.find("\"", emailPos + 9);

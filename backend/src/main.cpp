@@ -37,9 +37,18 @@ public:
   }());
 
   OATPP_CREATE_COMPONENT(std::shared_ptr<Database>, database)([] {
+    const char* portEnv = std::getenv("DB_PORT");
+    int dbPort = 5432;
+    if (portEnv) {
+      try {
+        dbPort = std::stoi(portEnv);
+      } catch (const std::exception&) {
+        throw std::runtime_error("DB_PORT must be a valid integer");
+      }
+    }
     return std::make_shared<Database>(
       std::getenv("DB_HOST") ? std::getenv("DB_HOST") : "localhost",
-      std::stoi(std::getenv("DB_PORT") ? std::getenv("DB_PORT") : "5432"),
+      dbPort,
       std::getenv("DB_USER") ? std::getenv("DB_USER") : "tracker_user",
       std::getenv("DB_PASSWORD") ? std::getenv("DB_PASSWORD") : "tracker_password",
       std::getenv("DB_NAME") ? std::getenv("DB_NAME") : "investment_tracker"
