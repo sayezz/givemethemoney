@@ -31,6 +31,26 @@ export interface Quote {
   currency: string;
 }
 
+export type TransactionType = 'buy' | 'sell' | 'dividend';
+
+// A dated cash flow on a position. All monetary values are in EUR.
+export interface Transaction {
+  id: number;
+  position_id: number;
+  txn_type: TransactionType;
+  txn_date: string;   // YYYY-MM-DD
+  quantity: number;   // shares (buy/sell); 0 for dividend
+  price: number;      // price per share, EUR
+  fee: number;        // EUR
+  amount: number;     // dividend cash (EUR); buy/sell gross ± fee
+  created_at?: string;
+}
+
+export interface HistoryPoint {
+  date: string;       // YYYY-MM-DD
+  close: number;      // native currency
+}
+
 export interface StockSearchResult {
   symbol: string;
   name: string;

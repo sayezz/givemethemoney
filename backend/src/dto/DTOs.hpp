@@ -72,6 +72,42 @@ class PositionDto : public oatpp::DTO {
   DTO_FIELD(String, created_at);
 };
 
+class TransactionDto : public oatpp::DTO {
+  DTO_INIT(TransactionDto, DTO)
+  DTO_FIELD(Int32, id);
+  DTO_FIELD(Int32, position_id);
+  DTO_FIELD(String, txn_type);
+  DTO_FIELD(String, txn_date);
+  DTO_FIELD(Float64, quantity);
+  DTO_FIELD(Float64, price);
+  DTO_FIELD(Float64, fee);
+  DTO_FIELD(Float64, amount);
+  DTO_FIELD(String, created_at);
+};
+
+class TransactionRequestDto : public oatpp::DTO {
+  DTO_INIT(TransactionRequestDto, DTO)
+  DTO_FIELD(String, txn_type);
+  DTO_FIELD(String, txn_date);
+  DTO_FIELD(Float64, quantity);
+  DTO_FIELD(Float64, price);
+  DTO_FIELD(Float64, fee);
+  DTO_FIELD(Float64, amount);
+};
+
+class TransactionsListResponseDto : public oatpp::DTO {
+  DTO_INIT(TransactionsListResponseDto, DTO)
+  DTO_FIELD(Boolean, success);
+  DTO_FIELD(Vector<Object<TransactionDto>>, transactions);
+};
+
+class TransactionResponseDto : public oatpp::DTO {
+  DTO_INIT(TransactionResponseDto, DTO)
+  DTO_FIELD(Boolean, success);
+  DTO_FIELD(String, message);
+  DTO_FIELD(Object<TransactionDto>, transaction);
+};
+
 class TrailingStopRequestDto : public oatpp::DTO {
   DTO_INIT(TrailingStopRequestDto, DTO)
   DTO_FIELD(Boolean, trailing_stop_active);
@@ -191,10 +227,35 @@ class YahooChartMetaDto : public oatpp::DTO {
   DTO_FIELD(Float64, regularMarketVolume);
 };
 
+class YahooQuoteIndicatorDto : public oatpp::DTO {
+  DTO_INIT(YahooQuoteIndicatorDto, DTO)
+  DTO_FIELD(Vector<Float64>, close);
+};
+
+class YahooIndicatorsDto : public oatpp::DTO {
+  DTO_INIT(YahooIndicatorsDto, DTO)
+  DTO_FIELD(Vector<Object<YahooQuoteIndicatorDto>>, quote);
+};
+
 class YahooChartResultDto : public oatpp::DTO {
   DTO_INIT(YahooChartResultDto, DTO)
 
   DTO_FIELD(Object<YahooChartMetaDto>, meta);
+  DTO_FIELD(Vector<Int64>, timestamp);
+  DTO_FIELD(Object<YahooIndicatorsDto>, indicators);
+};
+
+class StockHistoryPointDto : public oatpp::DTO {
+  DTO_INIT(StockHistoryPointDto, DTO)
+  DTO_FIELD(String, date);
+  DTO_FIELD(Float64, close);
+};
+
+class StockHistoryResponseDto : public oatpp::DTO {
+  DTO_INIT(StockHistoryResponseDto, DTO)
+  DTO_FIELD(Boolean, success);
+  DTO_FIELD(String, currency);
+  DTO_FIELD(Vector<Object<StockHistoryPointDto>>, points);
 };
 
 class YahooChartDto : public oatpp::DTO {

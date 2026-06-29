@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Dialog, DialogContent, DialogTitle, IconButton, Box, Typography,
-  Grid, Chip, CircularProgress, Paper,
+  Grid, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableHead,
+  TableRow, TextField, MenuItem, Button,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import type { Position, StockDetail, Quote } from '../types';
+import DeleteIcon from '@mui/icons-material/Delete';
+import type { Position, StockDetail, Quote, Transaction, TransactionType } from '../types';
+import { positionMetrics } from '../utils/metrics';
+import { buildValueSeries } from '../utils/portfolio';
+import WindowedValueChart from './WindowedValueChart';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -59,6 +64,13 @@ interface Props { position: Position; quote: Quote | null; fxRate: number | null
 const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose }) => {
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [txns, setTxns] = useState<Transaction[]>([]);
+  const [history, setHistory] = useState<{ currency: string; points: { date: string; close: number }[] }>({ currency: 'EUR', points: [] });
+  const [form, setForm] = useState({
+    txn_type: 'buy' as TransactionType,
+    txn_date: new Date().toISOString().slice(0, 10),
+    quantity: '', price: '', fee: '', amount: '',
+  });
 
   // All position figures are stored in EUR; convert the live native-currency
   // quote to EUR so every calculation below stays in one currency.
@@ -67,6 +79,55 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
     : quote.currency === 'EUR'
       ? quote.price
       : (fxRate ? quote.price / fxRate : null);
+
+  const loadTxns = () => {
+    axios.get(`${API_URL}/positions/${position.id}/transactions`)
+      .then((r) => setTxns(r.data.transactions || []))
+      .catch(() => {});
+  };
+  useEffect(loadTxns, [position.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    axios.get(`${API_URL}/stocks/history`, { params: { symbol: position.ticker, range: '10y' } })
+      .then((r) => setHistory({ currency: r.data.currency || 'EUR', points: r.data.points || [] }))
+      .catch(() => {});
+  }, [position.ticker]);
+
+  const metrics = positionMetrics(txns, currentPrice);
+
+  // Single-position value series (EUR) for the chart.
+  const fxMap: Record<string, number> = (quote && quote.currency !== 'EUR' && fxRate)
+    ? { [quote.currency]: fxRate } : {};
+  const posSeries = buildValueSeries(
+    [position],
+    { [position.id]: txns },
+    { [position.id]: history },
+    fxMap,
+  );
+  const buyDates = txns.filter((t) => t.txn_type === 'buy').map((t) => t.txn_date);
+  const sellDates = txns.filter((t) => t.txn_type === 'sell').map((t) => t.txn_date);
+
+  const addTxn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      txn_type: form.txn_type,
+      txn_date: form.txn_date,
+      quantity: Number.parseFloat(form.quantity) || 0,
+      price: Number.parseFloat(form.price) || 0,
+      fee: Number.parseFloat(form.fee) || 0,
+      amount: Number.parseFloat(form.amount) || 0,
+    };
+    try {
+      await axios.post(`${API_URL}/positions/${position.id}/transactions`, payload);
+      setForm({ ...form, quantity: '', price: '', fee: '', amount: '' });
+      loadTxns();
+    } catch { /* ignore */ }
+  };
+
+  const delTxn = async (id: number) => {
+    try { await axios.delete(`${API_URL}/transactions/${id}`); loadTxns(); }
+    catch { /* ignore */ }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -268,6 +329,100 @@ const PositionDetailModal: React.FC<Props> = ({ position, quote, fxRate, onClose
             </Box>
           </Section>
         )}
+        {/* ── Return indicators ───────────────────────── */}
+        <Section title="Renditekennzahlen">
+          <DataRow label="Investiert (inkl. Gebühren)" value={fmtEur(metrics.invested)} />
+          {metrics.realized > 0 && <DataRow label="Realisiert (Verkäufe)" value={fmtEur(metrics.realized)} />}
+          {metrics.dividends > 0 && <DataRow label="Dividenden gesamt" value={fmtEur(metrics.dividends)} />}
+          <DataRow label="Aktueller Wert" value={metrics.currentValue != null ? fmtEur(metrics.currentValue) : '—'} accent />
+          <DataRow
+            label="Gesamtrendite"
+            value={metrics.totalReturnPct != null
+              ? `${metrics.totalReturnPct >= 0 ? '+' : ''}${fmt(metrics.totalReturnPct)} %  (${metrics.totalReturnAbs! >= 0 ? '+' : ''}${fmtEur(metrics.totalReturnAbs)})`
+              : '—'}
+            accent
+          />
+          <DataRow label="Annualisiert (CAGR)" value={metrics.cagrPct != null ? `${metrics.cagrPct >= 0 ? '+' : ''}${fmt(metrics.cagrPct)} %` : '—'} />
+          <DataRow label="IRR (geldgewichtet, p.a.)" value={metrics.xirrPct != null ? `${metrics.xirrPct >= 0 ? '+' : ''}${fmt(metrics.xirrPct)} %` : '—'} accent />
+          <DataRow label="Haltedauer" value={metrics.holdingYears != null ? `${fmt(metrics.holdingYears)} Jahre` : '—'} />
+          {metrics.dividendOnCostPct != null && <DataRow label="Dividendenrendite auf Einstand" value={fmtPct(metrics.dividendOnCostPct)} />}
+        </Section>
+
+        {/* ── Value over time ─────────────────────────── */}
+        {posSeries.length > 1 && (
+          <Section title="Wertentwicklung (€)">
+            <Box p={1.5}>
+              <WindowedValueChart series={posSeries} buyDates={buyDates} sellDates={sellDates} valueLabel="Positionswert €" height={260} />
+            </Box>
+          </Section>
+        )}
+
+        {/* ── Transactions ────────────────────────────── */}
+        <Section title="Transaktionen">
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Datum</TableCell>
+                  <TableCell>Typ</TableCell>
+                  <TableCell align="right">Menge</TableCell>
+                  <TableCell align="right">Kurs €</TableCell>
+                  <TableCell align="right">Gebühr €</TableCell>
+                  <TableCell align="right">Betrag €</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {txns.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{t.txn_date.split('-').reverse().join('.')}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={t.txn_type === 'buy' ? 'Kauf' : t.txn_type === 'sell' ? 'Verkauf' : 'Dividende'}
+                        color={t.txn_type === 'buy' ? 'primary' : t.txn_type === 'sell' ? 'warning' : 'success'} />
+                    </TableCell>
+                    <TableCell align="right">{t.txn_type === 'dividend' ? '—' : fmt(t.quantity)}</TableCell>
+                    <TableCell align="right">{t.txn_type === 'dividend' ? '—' : fmt(t.price)}</TableCell>
+                    <TableCell align="right">{fmt(t.fee)}</TableCell>
+                    <TableCell align="right">{fmtEur(t.amount)}</TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" color="error" onClick={() => delTxn(t.id)}><DeleteIcon fontSize="small" /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {txns.length === 0 && (
+                  <TableRow><TableCell colSpan={7}><Typography variant="caption" color="text.secondary">Keine Transaktionen.</Typography></TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Box>
+
+          <Box component="form" onSubmit={addTxn} display="flex" flexWrap="wrap" gap={1.5} alignItems="center" p={1.5}>
+            <TextField select size="small" label="Typ" value={form.txn_type}
+              onChange={(e) => setForm({ ...form, txn_type: e.target.value as TransactionType })} sx={{ minWidth: 120 }}>
+              <MenuItem value="buy">Kauf</MenuItem>
+              <MenuItem value="sell">Verkauf</MenuItem>
+              <MenuItem value="dividend">Dividende</MenuItem>
+            </TextField>
+            <TextField size="small" type="date" label="Datum" value={form.txn_date}
+              onChange={(e) => setForm({ ...form, txn_date: e.target.value })}
+              InputLabelProps={{ shrink: true }} inputProps={{ max: new Date().toISOString().slice(0, 10) }} />
+            {form.txn_type !== 'dividend' && (
+              <>
+                <TextField size="small" type="number" label="Menge" value={form.quantity}
+                  onChange={(e) => setForm({ ...form, quantity: e.target.value })} inputProps={{ step: 'any', min: 0 }} sx={{ width: 110 }} />
+                <TextField size="small" type="number" label="Kurs €" value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })} inputProps={{ step: 'any', min: 0 }} sx={{ width: 110 }} />
+                <TextField size="small" type="number" label="Gebühr €" value={form.fee}
+                  onChange={(e) => setForm({ ...form, fee: e.target.value })} inputProps={{ step: 'any', min: 0 }} sx={{ width: 110 }} />
+              </>
+            )}
+            {form.txn_type === 'dividend' && (
+              <TextField size="small" type="number" label="Betrag €" value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })} inputProps={{ step: 'any', min: 0 }} sx={{ width: 130 }} />
+            )}
+            <Button type="submit" variant="contained" size="small">Hinzufügen</Button>
+          </Box>
+        </Section>
       </DialogContent>
     </Dialog>
   );

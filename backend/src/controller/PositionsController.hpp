@@ -7,6 +7,7 @@
 #include "../dto/DTOs.hpp"
 #include "../database/Database.hpp"
 #include "../repository/PositionRepository.hpp"
+#include "../repository/TransactionRepository.hpp"
 #include "../utils/CorsUtils.hpp"
 #include "../utils/EmailUtils.hpp"
 #include "../utils/JwtUtils.hpp"
@@ -22,7 +23,8 @@ public:
                       std::shared_ptr<Database> database)
     : oatpp::web::server::api::ApiController(objectMapper),
       m_database(database),
-      m_positionRepository(std::make_shared<PositionRepository>(database->getExecutor())) {
+      m_positionRepository(std::make_shared<PositionRepository>(database->getExecutor())),
+      m_transactionRepository(std::make_shared<TransactionRepository>(database->getExecutor())) {
     const char* secret = std::getenv("JWT_SECRET");
     if (!secret || std::string(secret).empty()) {
       throw std::runtime_error("JWT_SECRET environment variable must be set");
@@ -289,6 +291,110 @@ public:
     return createCorsPreflightResponse();
   }
 
+  // --- Transactions ---------------------------------------------------------
+  ENDPOINT("GET", "/api/transactions", getAllTransactions,
+           REQUEST(std::shared_ptr<IncomingRequest>, request)) {
+    int userId = 0; std::string userEmail;
+    auto authError = authenticate(request, userId, userEmail);
+    if (authError) return authError;
+
+    auto result = m_transactionRepository->findByUserId(oatpp::Int32(userId));
+    if (!result->isSuccess()) {
+      return errorResponse(Status::CODE_400, "Failed to load transactions");
+    }
+    auto response = TransactionsListResponseDto::createShared();
+    response->success = true;
+    response->transactions = result->fetch<oatpp::Vector<oatpp::Object<TransactionDto>>>();
+    return createCorsDtoResponse(Status::CODE_200, response);
+  }
+
+  ENDPOINT("OPTIONS", "/api/transactions", optionsAllTransactions) {
+    return createCorsPreflightResponse();
+  }
+
+  ENDPOINT("GET", "/api/positions/{id}/transactions", getTransactions,
+           REQUEST(std::shared_ptr<IncomingRequest>, request),
+           PATH(Int32, id)) {
+    int userId = 0; std::string userEmail;
+    auto authError = authenticate(request, userId, userEmail);
+    if (authError) return authError;
+
+    auto result = m_transactionRepository->findByPositionId(id, oatpp::Int32(userId));
+    if (!result->isSuccess()) {
+      return errorResponse(Status::CODE_400, "Failed to load transactions");
+    }
+    auto response = TransactionsListResponseDto::createShared();
+    response->success = true;
+    response->transactions = result->fetch<oatpp::Vector<oatpp::Object<TransactionDto>>>();
+    return createCorsDtoResponse(Status::CODE_200, response);
+  }
+
+  ENDPOINT("POST", "/api/positions/{id}/transactions", createTransaction,
+           REQUEST(std::shared_ptr<IncomingRequest>, request),
+           PATH(Int32, id),
+           BODY_DTO(Object<TransactionRequestDto>, body)) {
+    int userId = 0; std::string userEmail;
+    auto authError = authenticate(request, userId, userEmail);
+    if (authError) return authError;
+
+    std::string type = body->txn_type ? std::string(*body->txn_type) : "buy";
+    if (type != "buy" && type != "sell" && type != "dividend") {
+      return errorResponse(Status::CODE_400, "txn_type must be buy, sell or dividend");
+    }
+    oatpp::Float64 quantity = body->quantity ? body->quantity : oatpp::Float64(0.0);
+    oatpp::Float64 price    = body->price ? body->price : oatpp::Float64(0.0);
+    oatpp::Float64 fee      = body->fee ? body->fee : oatpp::Float64(0.0);
+    // For dividends the cash is `amount`; for buy/sell derive gross from qty*price.
+    oatpp::Float64 amount;
+    if (type == "dividend") {
+      amount = body->amount ? body->amount : oatpp::Float64(0.0);
+    } else {
+      double gross = (*quantity) * (*price);
+      amount = oatpp::Float64(type == "buy" ? gross + *fee : gross - *fee);
+    }
+
+    auto result = m_transactionRepository->create(
+      id, oatpp::Int32(userId), oatpp::String(type.c_str()),
+      body->txn_date, quantity, price, fee, amount);
+    if (!result->isSuccess()) {
+      return errorResponse(Status::CODE_400, "Failed to create transaction");
+    }
+    auto rows = result->fetch<oatpp::Vector<oatpp::Object<TransactionDto>>>();
+    if (rows->size() == 0) {
+      return errorResponse(Status::CODE_404, "Position not found");
+    }
+    auto response = TransactionResponseDto::createShared();
+    response->success = true;
+    response->message = "Transaction created";
+    response->transaction = rows[0];
+    return createCorsDtoResponse(Status::CODE_201, response);
+  }
+
+  ENDPOINT("OPTIONS", "/api/positions/{id}/transactions", optionsTransactions) {
+    return createCorsPreflightResponse();
+  }
+
+  ENDPOINT("DELETE", "/api/transactions/{txnId}", deleteTransaction,
+           REQUEST(std::shared_ptr<IncomingRequest>, request),
+           PATH(Int32, txnId)) {
+    int userId = 0; std::string userEmail;
+    auto authError = authenticate(request, userId, userEmail);
+    if (authError) return authError;
+
+    auto result = m_transactionRepository->deleteById(txnId, oatpp::Int32(userId));
+    if (!result->isSuccess()) {
+      return errorResponse(Status::CODE_400, "Failed to delete transaction");
+    }
+    auto response = ErrorResponseDto::createShared();
+    response->success = true;
+    response->message = "Transaction deleted";
+    return createCorsDtoResponse(Status::CODE_200, response);
+  }
+
+  ENDPOINT("OPTIONS", "/api/transactions/{txnId}", optionsTransactionById) {
+    return createCorsPreflightResponse();
+  }
+
 private:
   template <class T>
   std::shared_ptr<OutgoingResponse> createCorsDtoResponse(const Status& status, const T& dto) {
@@ -332,6 +438,7 @@ private:
 
   std::shared_ptr<Database> m_database;
   std::shared_ptr<PositionRepository> m_positionRepository;
+  std::shared_ptr<TransactionRepository> m_transactionRepository;
   std::string m_jwtSecret;
 };
 

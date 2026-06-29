@@ -12,10 +12,13 @@ import AddIcon from '@mui/icons-material/Add';
 import LogoutIcon from '@mui/icons-material/Logout';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAuth } from '../context/AuthContext';
+import InsightsIcon from '@mui/icons-material/Insights';
 import AddPositionForm from '../components/AddPositionForm';
 import PositionDetailModal from '../components/PositionDetailModal';
+import PortfolioAnalysis from '../components/PortfolioAnalysis';
 import { normalizeQuote, formatAmount } from '../utils/currency';
-import type { Position, Quote } from '../types';
+import { positionMetrics } from '../utils/metrics';
+import type { Position, Quote, Transaction } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -27,11 +30,13 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const [positions, setPositions] = useState<Position[]>([]);
+  const [txnsByPos, setTxnsByPos] = useState<Record<number, Transaction[]>>({});
   const [quotes, setQuotes] = useState<Quotes>({});
   const [fxRates, setFxRates] = useState<FxRates>({});
   const [quotesUpdatedAt, setQuotesUpdatedAt] = useState<Date | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [showEur, setShowEur] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -95,6 +100,14 @@ const Dashboard: React.FC = () => {
       const loaded: Position[] = data.positions || [];
       setPositions(loaded);
       if (loaded.length > 0) loadQuotes(loaded);
+      // Load transactions for per-position IRR in the table.
+      axios.get(`${API_URL}/transactions`).then((r) => {
+        const grouped: Record<number, Transaction[]> = {};
+        for (const t of (r.data.transactions || []) as Transaction[]) {
+          (grouped[t.position_id] ||= []).push(t);
+        }
+        setTxnsByPos(grouped);
+      }).catch(() => {});
     } catch (err: any) {
       setLoadError(err.response?.data?.message || 'Positionen konnten nicht geladen werden.');
     } finally {
@@ -155,8 +168,8 @@ const Dashboard: React.FC = () => {
     catch (err: any) { alert(err.response?.data?.message || 'Trailing Stop konnte nicht aktualisiert werden.'); }
   };
 
-  const headers = ['Kaufdatum', 'Ticker', 'Name', 'Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'Quelle', ''];
-  const rightCols = new Set(['Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite']);
+  const headers = ['Kaufdatum', 'Ticker', 'Name', 'Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'IRR p.a.', 'Quelle', ''];
+  const rightCols = new Set(['Menge', 'Kurs', 'Kaufpreis', 'Akt. Kurs', '+/−', 'Erlös', 'Netto', 'Rendite', 'IRR p.a.']);
   const gainColor = '#81c784';
   const lossColor = '#e57373';
 
@@ -226,12 +239,28 @@ const Dashboard: React.FC = () => {
               <Button size="small" startIcon={<RefreshIcon />} onClick={() => loadQuotes(positions)}>
                 Aktualisieren
               </Button>
+              <Button size="small" variant={showAnalysis ? 'contained' : 'outlined'} startIcon={<InsightsIcon />} onClick={() => setShowAnalysis((v) => !v)}>
+                Analyse
+              </Button>
               {quotesUpdatedAt && (
                 <Typography variant="caption" color="text.secondary">
                   Kurse: {quotesUpdatedAt.toLocaleTimeString('de-DE')}
                 </Typography>
               )}
             </Box>
+
+            {showAnalysis && (
+              <Box mb={3}>
+                <PortfolioAnalysis
+                  positions={positions}
+                  priceEurById={positions.reduce((acc, p) => {
+                    acc[p.id] = priceInEur(quotes[p.id] ?? null);
+                    return acc;
+                  }, {} as Record<number, number | null>)}
+                  fxRates={fxRates}
+                />
+              </Box>
+            )}
 
             <TableContainer component={Paper}>
               <Table size="small">
@@ -287,6 +316,12 @@ const Dashboard: React.FC = () => {
                       ? '…'
                       : `${netProfit >= 0 ? '+' : ''}${((netProfit / acquisitionCost) * 100).toFixed(2)} %`;
 
+                    // Money-weighted annualized return (IRR/XIRR) from this
+                    // position's transactions + current EUR value.
+                    const irrPct = positionMetrics(txnsByPos[position.id] || [], currentPrice).xirrPct;
+                    const irrColor = irrPct == null ? 'inherit' : irrPct >= 0 ? gainColor : lossColor;
+                    const irrDisplay = irrPct == null ? '…' : `${irrPct >= 0 ? '+' : ''}${irrPct.toFixed(2)} %`;
+
                     return (
                       <TableRow key={position.id} hover sx={{ bgcolor: rowBg, cursor: 'pointer' }} onClick={() => setSelectedPosition(position)}>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
@@ -305,6 +340,7 @@ const Dashboard: React.FC = () => {
                         <TableCell align="right">{formatAmount(toNative(netProceeds), netProceeds, nativeCurrency, showEur)}</TableCell>
                         <TableCell align="right" sx={{ color: netColor }}>{formatAmount(toNative(netProfit), netProfit, nativeCurrency, showEur, 2, true)}</TableCell>
                         <TableCell align="right" sx={{ color: netColor }}>{retDisplay}</TableCell>
+                        <TableCell align="right" sx={{ color: irrColor }}>{irrDisplay}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Select
                             native
